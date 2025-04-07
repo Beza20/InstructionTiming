@@ -1,3 +1,4 @@
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -41,6 +42,7 @@ public class MovementTracker : MonoBehaviour
     void Update()
     {
         velocityTimer += Time.deltaTime;
+        // smoothes velocities every 0.1 seconds over 10 enteries.
 
         if (velocityTimer >= velocityUpdateInterval)
         {

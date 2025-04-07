@@ -1,52 +1,110 @@
-using System.Collections;
 using UnityEngine;
 
 public class MovementTrigger : MonoBehaviour
 {
+    [Header("Dependencies")]
     [SerializeField] private MovementTracker movementTracker;
     [SerializeField] private ObjectRotationTracker objectTracker;
+    [SerializeField] private AudioSource beepAudio;
 
-    public AudioSource beepAudio;
+    [Header("Thresholds")]
+    public float headRotationThreshold = 5f;    // Degrees in 0.2s window
+    public float handVelocityThreshold = 0.05f; // m/s threshold
+    public float requiredDuration = 2f;        // Seconds of continuous movement
 
-    public float velocityThreshold = 0.1f;       // Hand movement threshold (m/s)
-    public float rotationThreshold = 5.0f;       // Head rotation difference threshold (degrees)
-    public float requiredTime = 2f;              // Time condition must hold
+    [Header("Tolerance")]
+    public float gracePeriod = 0.3f;          // Allow brief interruptions
+    public float cooldownDuration = 1f;       // Prevent rapid retriggering
 
-    private float conditionMetTime = 0f;
     private bool canTrigger = true;
+    private float conditionMetTime = 0f;
+    private float gracePeriodTimer = 0f;
+    private bool wasConditionMet = false;
 
     void Update()
     {
-        float leftVelocity = movementTracker.GetLeftHandVelocity();
-        float rightVelocity = movementTracker.GetRightHandVelocity();
-        float headRotationDifference = movementTracker.GetHeadRotationDifference();  // <-- Use rotation difference, not angular velocity
+        if (!canTrigger) return;
 
-        bool isHandStill = (leftVelocity < velocityThreshold) && (rightVelocity < velocityThreshold);
-        bool isHeadRotating = headRotationDifference > rotationThreshold;
-        bool areObjectsStill = objectTracker.AreObjectsStill(requiredTime);
+        // Get smoothed values
+        float headRotation = movementTracker.GetHeadRotationDifference();
+        float leftHandVel = movementTracker.GetLeftHandVelocity();
+        float rightHandVel = movementTracker.GetRightHandVelocity();
+        
+        // Check current conditions
+        bool headMoving = headRotation > headRotationThreshold;
+        bool handsStill = (leftHandVel < handVelocityThreshold) && 
+                         (rightHandVel < handVelocityThreshold);
+        bool objectsStill = objectTracker.AreObjectsStill(requiredDuration);
+        bool conditionsMet = headMoving && handsStill && objectsStill;
 
+        // if(headMoving)
+        // {
+        //     Debug.Log("head is moving because rotation is at " + headRotation);
+            
+        // }
+        // if (!headMoving)
+        // {
+        //     Debug.Log("head is not moving because rotation is at " + headRotation);
+        // }
 
-        if (isHandStill && isHeadRotating && areObjectsStill)
+       
+
+        // head is moving but hands and objects are not.
+        if (conditionsMet)
         {
-            conditionMetTime += Time.deltaTime;
+            HandleSuccessfulCondition();
+        }
+        else
+        {
+            HandleFailedCondition();
+        }
+    }
 
-            if (conditionMetTime >= requiredTime && canTrigger)
+    
+
+    private void HandleSuccessfulCondition()
+    {
+        gracePeriodTimer = 0f; // Reset grace period when conditions are good
+        conditionMetTime += Time.deltaTime;
+        Debug.Log("conditions met but not long enough");
+        if (conditionMetTime >= requiredDuration)
+        {
+            StartCoroutine(TriggerBeep());
+            conditionMetTime = 0f;
+        }
+    }
+
+    // added this because it was too constrictive when it kept having to restart the time when for an instance a person moved their hands
+    private void HandleFailedCondition()
+    {
+        // Only start counting grace period if we had met conditions before
+        if (conditionMetTime > 0)
+        {
+            gracePeriodTimer += Time.deltaTime;
+            
+            // If we exceed grace period, reset everything
+            if (gracePeriodTimer >= gracePeriod)
             {
-                StartCoroutine(TriggerBeep());
+                Debug.Log("conditions are not met so restarting at "  + conditionMetTime + "and" + gracePeriodTimer);
                 conditionMetTime = 0f;
+                gracePeriodTimer = 0f;
             }
         }
         else
         {
-            conditionMetTime = 0f;  // Reset if condition not met
+            gracePeriodTimer = 0f; // Reset if we weren't making progress
         }
     }
 
-    IEnumerator TriggerBeep()
+    private System.Collections.IEnumerator TriggerBeep()
     {
         canTrigger = false;
         beepAudio.Play();
-        yield return new WaitForSeconds(1f);  // Cooldown
+        
+        yield return new WaitForSeconds(cooldownDuration);
+        
         canTrigger = true;
+        conditionMetTime = 0f; // Full reset after successful trigger
+        gracePeriodTimer = 0f;
     }
 }
