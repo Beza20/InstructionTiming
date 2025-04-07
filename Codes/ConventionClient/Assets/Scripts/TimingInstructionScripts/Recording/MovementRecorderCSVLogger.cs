@@ -109,7 +109,7 @@ public class MovementRecorderCSVLogger : MonoBehaviour
     {
         if (state == PlayModeStateChange.ExitingPlayMode)
         {
-            Debug.Log("🛑 Exiting play mode. Finalizing CSV log...");
+            Debug.Log(" Exiting play mode. Finalizing CSV log...");
             EndRecordingSession();
         }
     }
