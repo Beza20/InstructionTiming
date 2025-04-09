@@ -27,40 +27,84 @@ public class MovementReplayer : MonoBehaviour
     }
 
     public string filePath = "Assets/movements_Rashult_20250115_155918.json";
-    public List<GameObject> prefabsToReplay; // Prefabs for replay
+    public List<GameObject> prefabsToReplay;
     public float replaySpeed = 10f;
+    
+    [SerializeField] private int _targetFrame = 0; // Serialized field for target frame
+    [SerializeField] private Slider replaySlider;
 
     private List<FrameData> replayFrames = new List<FrameData>();
     private List<GameObject> replayObjects = new List<GameObject>();
     private float replayTime = 0f;
     private int currentFrame = 0;
-
-    [SerializeField] Slider replay_slider;
+    private bool isInitialized = false;
 
     private void Start()
     {
         LoadFromJson(filePath);
         SetupReplayObjects();
-        StartReplaying();
-        replay_slider.onValueChanged.AddListener (delegate {ValueChangeCheck ();});
+        
+        if (replayFrames.Count > 0)
+        {
+            // Calculate start time (2 seconds before target frame)
+            float targetTime = _targetFrame / FRAME_RATE;
+            float startTime = Mathf.Max(0, targetTime - 10f);
+            
+            // Convert back to frames
+            currentFrame = Mathf.FloorToInt(startTime * FRAME_RATE);
+            replayTime = startTime;
+            
+            UpdateObjectsToFrame(currentFrame);
+            isInitialized = true;
+        }
+        
+        if (replaySlider != null)
+        {
+            replaySlider.onValueChanged.AddListener(OnSliderValueChanged);
+        }
     }
 
     private void Update()
     {
-        if (replayFrames.Count > 0)
+        if (!isInitialized || replayFrames.Count == 0) return;
+
+        replayTime += Time.deltaTime * replaySpeed;
+        int newFrame = Mathf.FloorToInt(replayTime * FRAME_RATE);
+
+        if (newFrame != currentFrame && newFrame < replayFrames.Count)
         {
-            ReplayMovement();
+            currentFrame = newFrame;
+            UpdateObjectsToFrame(currentFrame);
+            
+            // Update slider if available
+            if (replaySlider != null)
+            {
+                replaySlider.SetValueWithoutNotify((float)currentFrame / (replayFrames.Count - 1));
+            }
         }
     }
 
-    public void ValueChangeCheck()
-	{
-		Debug.Log (replay_slider.value);
-        currentFrame = (int)(replayFrames.Count * replay_slider.value);
-        replayTime = (float)currentFrame;
+    private void OnSliderValueChanged(float value)
+    {
+        if (replayFrames.Count == 0) return;
+        
+        currentFrame = Mathf.FloorToInt(value * (replayFrames.Count - 1));
+        replayTime = currentFrame / FRAME_RATE;
+        UpdateObjectsToFrame(currentFrame);
+    }
 
-
-	}
+    private void UpdateObjectsToFrame(int frameIndex)
+    {
+        foreach (var objData in replayFrames[frameIndex].objects)
+        {
+            GameObject obj = replayObjects.Find(o => o.name == objData.name);
+            if (obj != null)
+            {
+                obj.transform.position = objData.position;
+                obj.transform.rotation = objData.rotation;
+            }
+        }
+    }
 
     private void LoadFromJson(string filePath)
     {
@@ -73,10 +117,8 @@ public class MovementReplayer : MonoBehaviour
         try
         {
             string json = File.ReadAllText(filePath);
-            // Parse the JSON as an array of RootData
             var rootDataArray = JsonUtility.FromJson<RootDataArrayWrapper>("{\"items\":" + json + "}");
 
-            // Flatten all frames from all roots
             replayFrames = new List<FrameData>();
             foreach (var root in rootDataArray.items)
             {
@@ -93,16 +135,11 @@ public class MovementReplayer : MonoBehaviour
 
     private void SetupReplayObjects()
     {
-        if (replayFrames.Count == 0)
-        {
-            Debug.LogError("No frames loaded. Cannot set up replay objects.");
-            return;
-        }
+        if (replayFrames.Count == 0) return;
 
         foreach (var objData in replayFrames[0].objects)
         {
             GameObject prefab = prefabsToReplay.Find(p => p.name == objData.name);
-
             if (prefab != null)
             {
                 GameObject obj = Instantiate(prefab);
@@ -116,36 +153,6 @@ public class MovementReplayer : MonoBehaviour
         }
     }
 
-    private void StartReplaying()
-    {
-        replayTime = 0f;
-        currentFrame = 0;
-        Debug.Log("Replaying started.");
-    }
-
-    private void ReplayMovement()
-    {
-        replayTime += Time.deltaTime * replaySpeed;
-        int newFrame = Mathf.FloorToInt(replayTime);
-
-        if (newFrame != currentFrame && newFrame < replayFrames.Count)
-        {
-            currentFrame = newFrame;
-
-            foreach (var objData in replayFrames[currentFrame].objects)
-            {
-                GameObject obj = replayObjects.Find(o => o.name == objData.name);
-
-                if (obj != null)
-                {
-                    obj.transform.position = objData.position;
-                    obj.transform.rotation = objData.rotation;
-                    //Debug.Log("changing pos");
-                }
-            }
-        }
-    }
-
     [System.Serializable]
     private class RootDataArrayWrapper
     {
@@ -154,6 +161,9 @@ public class MovementReplayer : MonoBehaviour
 
     public bool HasFinishedReplay()
     {
+        if (replayFrames.Count == 0) return true;
         return currentFrame >= replayFrames.Count - 1;
     }
+
+    private const float FRAME_RATE = 13.5f; // Match this with your recording frame rate
 }
