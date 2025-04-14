@@ -430,7 +430,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 436690458ed841340b36aea73f1cb1dc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  filePath: Assets/P9.json
+  filePath: C:\Users\Public\P1.json
   prefabsToReplay:
   - {fileID: 3142353286726372109, guid: 19ed3e9ecb2214e4f916fe7a8bbd8657, type: 3}
   - {fileID: 2889352106814851035, guid: 214eb89a4b1bd554daaeb0874b821320, type: 3}
@@ -447,8 +447,9 @@ MonoBehaviour:
   - {fileID: 2019114577442225099, guid: 095059f8b81c61b4dbe91c2bc9cf3473, type: 3}
   - {fileID: 7420626179081191198, guid: 81d619301f9f39f409b0e8b1730288c2, type: 3}
   - {fileID: 4761093617223964764, guid: f1156a15b43a8e14da3bf1c433759783, type: 3}
-  replaySpeed: 40
-  replay_slider: {fileID: 1584841170}
+  replaySpeed: 2
+  _targetFrame: 22090
+  replaySlider: {fileID: 1584841170}
 --- !u!4 &641385291
 Transform:
   m_ObjectHideFlags: 0

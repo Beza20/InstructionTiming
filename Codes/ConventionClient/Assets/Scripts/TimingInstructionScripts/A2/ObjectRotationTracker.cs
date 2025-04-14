@@ -28,21 +28,19 @@ public class ObjectRotationTracker : MonoBehaviour
 
     void Update()
     {
-        timer += Time.deltaTime;
-        if (timer >= recordInterval)
+       
+
+        float now = Time.time;
+        foreach (GameObject obj in trackedObjects)
         {
-            float now = Time.time;
-            foreach (GameObject obj in trackedObjects)
+            //Debug.Log($"[Tracker] Logged rotation for {obj.name} at {now}");
+            rotationLogs[obj].Add(new RotationHistory
             {
-                rotationLogs[obj].Add(new RotationHistory
-                {
-                    rotation = obj.transform.rotation,
-                    position = obj.transform.position,
-                    timestamp = now
-                });
-            }
-            timer = 0f;
-        }
+                rotation = obj.transform.rotation,
+                position = obj.transform.position,
+                timestamp = now
+            });
+        }    
     }
 
     public Dictionary<GameObject, List<RotationHistory>> GetRotationLogs()
@@ -83,5 +81,54 @@ public class ObjectRotationTracker : MonoBehaviour
         }
 
         return true;
+    }
+
+    public bool IsObjectMoving(GameObject obj, float windowSeconds = 1f)
+    {
+        float now = Time.time;
+        if (!rotationLogs.ContainsKey(obj)) return false;
+
+        var history = rotationLogs[obj];
+        ObjectRotationTracker.RotationHistory past = null;
+
+        for (int i = history.Count - 1; i >= 0; i--)
+        {
+            if (now - history[i].timestamp >= windowSeconds)
+            {
+                past = history[i];
+                break;
+            }
+        }
+
+        if (past != null)
+        {
+            float distance = Vector3.Distance(obj.transform.position, past.position);
+            return distance > positionDeltaThreshold; // Use your existing threshold
+        }
+
+        return false;
+    }
+
+    public RotationHistory GetClosestSnapshot(GameObject obj, float targetTimestamp)
+    {
+        if (!rotationLogs.ContainsKey(obj) || rotationLogs[obj].Count == 0)
+            return null;
+
+        List<RotationHistory> history = rotationLogs[obj];
+
+        RotationHistory closest = history[0];
+        float closestDiff = Mathf.Abs(targetTimestamp - closest.timestamp);
+
+        for (int i = 1; i < history.Count; i++)
+        {
+            float diff = Mathf.Abs(targetTimestamp - history[i].timestamp);
+            if (diff < closestDiff)
+            {
+                closest = history[i];
+                closestDiff = diff;
+            }
+        }
+
+        return closest;
     }
 }

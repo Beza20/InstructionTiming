@@ -21,7 +21,7 @@ public class ErrorBasedInstruction : MonoBehaviour
             return;
         }
         // Get errors directly from FurnitureState
-        int currentSubtaskIndex = furnitureState.GetCurrentSubtaskIndex();
+        int currentSubtaskIndex = furnitureState.GetCurrentIssueIndex();
         if (currentSubtaskIndex < 0) return;
 
         float positionError = furnitureState.GetCurrentPositionError();

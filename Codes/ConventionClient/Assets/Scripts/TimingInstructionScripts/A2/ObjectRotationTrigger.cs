@@ -11,7 +11,7 @@ public class ObjectRotationTrigger : MonoBehaviour
     public float checkInterval = 0.1f;
     public float returnThreshold = 20f; // Degrees
     public float minReturnTime = 0.3f;
-    public float maxReturnTime = 2.5f;
+    public float maxReturnTime = 10f;
     public float triggerCooldown = 1.5f;
 
     private float checkTimer = 0f;
@@ -32,6 +32,7 @@ public class ObjectRotationTrigger : MonoBehaviour
             {
                 GameObject obj = kvp.Key;
                 List<ObjectRotationTracker.RotationHistory> history = kvp.Value;
+                //Debug.Log("angular velocity "+ kvp.Value + "at " + checkTimer);
 
                 // Cooldown check
                 if (lastTriggerTime.ContainsKey(obj) && now - lastTriggerTime[obj] < triggerCooldown)

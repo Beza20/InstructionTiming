@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -10,8 +9,8 @@ public class FurnitureState : MonoBehaviour
     public class SubtaskData
     {
         public string SubtaskName;
-        public float RelativeDistance; // Ideal relative distance
-        public Quaternion AngleDifference; // Ideal angular difference
+        public float RelativeDistance;
+        public Quaternion AngleDifference;
     }
 
     [System.Serializable]
@@ -23,63 +22,76 @@ public class FurnitureState : MonoBehaviour
     [System.Serializable]
     public class FurnitureConfig
     {
-        public string FurnitureName; // Name of the furniture
-        public TextAsset IdealStateFile; // JSON file for the ideal state
-        public List<GameObject> SubtaskPiecesA; // Subtask objects A
-        public List<GameObject> SubtaskPiecesB; // Subtask objects B
+        public string FurnitureName;
+        public TextAsset IdealStateFile;
+        public List<GameObject> SubtaskPiecesA;
+        public List<GameObject> SubtaskPiecesB;
+        public List<int[]> InterchangeableGroups; // Groups of indices for interchangeable pieces
     }
 
-    public List<FurnitureConfig> FurnitureConfigs; // List of all furniture configurations
+    public List<FurnitureConfig> FurnitureConfigs;
     public Slider progressBar;
     public TextMeshProUGUI progressText;
 
-    private FurnitureConfig activeFurnitureConfig; // Current active furniture configuration
+    private FurnitureConfig activeFurnitureConfig;
     private IdealStateData idealStateData;
+    private Dictionary<int, int> pieceAssignments = new Dictionary<int, int>();
+    private Dictionary<int, List<int>> groupLookup = new Dictionary<int, List<int>>();
 
     private float progress;
     private const float positionTolerance = 0.05f;
-    private const float orientationTolerance = 2;
-    private int currentSubtaskIndex = -1;
+    private const float orientationTolerance = 2f;
+    private int currentIssueIndex = -1;
     private float currentPositionError = 0f;
     private float currentRotationError = 0f;
 
-    /// <summary>
-    /// Sets the active furniture based on the name provided by the manager.
-    /// </summary>
     public void SetActiveFurniture(string furnitureName)
     {
         activeFurnitureConfig = FurnitureConfigs.Find(config => config.FurnitureName == furnitureName);
-
         if (activeFurnitureConfig == null)
         {
             Debug.LogError($"No configuration found for furniture: {furnitureName}");
             return;
         }
 
-        Debug.Log($"Active furniture set to: {furnitureName}");
-
         LoadIdealState();
-        SetSubtaskPieces(activeFurnitureConfig.SubtaskPiecesA, activeFurnitureConfig.SubtaskPiecesB);
+        InitializeInterchangeableGroups();
     }
 
     private void LoadIdealState()
     {
-        if (activeFurnitureConfig == null || activeFurnitureConfig.IdealStateFile == null)
+        if (activeFurnitureConfig?.IdealStateFile == null)
         {
-            Debug.LogError("No ideal state file assigned for the active furniture.");
+            Debug.LogError("No ideal state file assigned");
             return;
         }
 
-        string json = activeFurnitureConfig.IdealStateFile.text; // Read the content of the uploaded file
-        idealStateData = JsonUtility.FromJson<IdealStateData>(json);
-
-        if (idealStateData != null && idealStateData.Subtasks.Count > 0)
+        idealStateData = JsonUtility.FromJson<IdealStateData>(activeFurnitureConfig.IdealStateFile.text);
+        if (idealStateData?.Subtasks == null)
         {
-            Debug.Log("Ideal state data loaded successfully.");
+            Debug.LogError("Failed to load ideal state data");
         }
-        else
+    }
+
+    private void InitializeInterchangeableGroups()
+    {
+        pieceAssignments.Clear();
+        groupLookup.Clear();
+
+        // Initialize all pieces as unassigned (-1 means no assignment)
+        for (int i = 0; i < activeFurnitureConfig.SubtaskPiecesA.Count; i++)
         {
-            Debug.LogError("Failed to load ideal state data or no subtasks available.");
+            pieceAssignments[i] = -1;
+        }
+
+        // Build group lookup
+        if (activeFurnitureConfig.InterchangeableGroups != null)
+        {
+            foreach (var group in activeFurnitureConfig.InterchangeableGroups)
+            {
+                int groupId = groupLookup.Count;
+                groupLookup[groupId] = new List<int>(group);
+            }
         }
     }
 
@@ -90,81 +102,164 @@ public class FurnitureState : MonoBehaviour
 
     private void CalculateProgress()
     {
-        if (idealStateData == null || idealStateData.Subtasks.Count == 0)
-        {
-            Debug.LogWarning("No subtasks available for progress calculation.");
-            return;
-        }
+        if (idealStateData == null || activeFurnitureConfig == null) return;
 
-        float totalError = 0f;
-        bool stopCalculation = false;
+        // First detect all current connections
+        List<DetectedConnection> currentConnections = DetectCurrentConnections();
+
+        // Resolve piece assignments based on current connections
+        ResolvePieceAssignments(currentConnections);
+
+        // Evaluate progress based on resolved assignments
+        EvaluateProgressWithAssignments(currentConnections);
+    }
+
+    private List<DetectedConnection> DetectCurrentConnections()
+    {
+        List<DetectedConnection> connections = new List<DetectedConnection>();
 
         for (int i = 0; i < activeFurnitureConfig.SubtaskPiecesA.Count; i++)
         {
             GameObject pieceA = activeFurnitureConfig.SubtaskPiecesA[i];
-            GameObject pieceB = activeFurnitureConfig.SubtaskPiecesB[i];
+            if (pieceA == null) continue;
 
-            if (pieceA == null || pieceB == null)
+            // Check against all potential B pieces (including interchangeable ones)
+            for (int j = 0; j < activeFurnitureConfig.SubtaskPiecesB.Count; j++)
             {
-                Debug.LogError($"Invalid objects for subtask {i + 1}");
-                continue;
-            }
+                GameObject pieceB = activeFurnitureConfig.SubtaskPiecesB[j];
+                if (pieceB == null) continue;
 
-            float subtaskError = 0f;
+                float distance = Vector3.Distance(pieceA.transform.position, pieceB.transform.position);
+                Quaternion rotationDiff = Quaternion.Inverse(pieceA.transform.rotation) * pieceB.transform.rotation;
 
-            if (!stopCalculation)
-            {
-                float currentDistance = Vector3.Distance(pieceA.transform.position, pieceB.transform.position);
-                SubtaskData idealSubtask = idealStateData.Subtasks[i];
-                float idealDistance = idealSubtask.RelativeDistance;
-                Quaternion currentDiff = Quaternion.Inverse(pieceA.transform.rotation) * pieceB.transform.rotation;
-                float diff_diff = Quaternion.Angle(idealSubtask.AngleDifference, currentDiff);
-
-                float positionError = Mathf.Max(0, (Mathf.Abs(currentDistance - idealDistance) - positionTolerance));
-                positionError = Mathf.Clamp(positionError / (1f - positionTolerance), 0f, 1f);
-
-                float orientationError = Mathf.Max(0, diff_diff - orientationTolerance) / 180;
-                orientationError = Mathf.Clamp(orientationError / (1f - (orientationTolerance / 180)), 0f, 1f);
-
-                subtaskError = Mathf.Clamp((0.4f * positionError) + (0.6f * orientationError), 0f, 1f);
-
-                if (subtaskError > 0.05f)
+                // Check against the ideal state for this subtask
+                SubtaskData ideal = idealStateData.Subtasks[i];
+                if (Mathf.Abs(distance - ideal.RelativeDistance) <= positionTolerance &&
+                    Quaternion.Angle(rotationDiff, ideal.AngleDifference) <= orientationTolerance)
                 {
-                    currentSubtaskIndex = i;
-                    currentPositionError = positionError;
-                    currentRotationError = orientationError;
-                    stopCalculation = true; // Skip subsequent subtasks
-                    Debug.Log($"Subtask {i + 1} is incomplete. Skipping subsequent subtasks.");
+                    connections.Add(new DetectedConnection {
+                        PieceAIndex = i,
+                        PieceBIndex = j,
+                        Distance = distance,
+                        RotationDiff = rotationDiff,
+                        MatchedSubtaskIndex = i
+                    });
                 }
             }
-            else
+        }
+        return connections;
+    }
+
+    private void ResolvePieceAssignments(List<DetectedConnection> connections)
+    {
+        // Reset assignments
+        for (int i = 0; i < pieceAssignments.Count; i++)
+        {
+            pieceAssignments[i] = -1;
+        }
+
+        // Process connections to assign pieces
+        foreach (var conn in connections)
+        {
+            // If this pieceA isn't assigned yet
+            if (pieceAssignments[conn.PieceAIndex] == -1)
             {
-                subtaskError = 1f;
+                // Check if pieceB is in any interchangeable group
+                bool assigned = false;
+                foreach (var group in groupLookup.Values)
+                {
+                    if (group.Contains(conn.PieceBIndex))
+                    {
+                        // Assign to the first piece in the group (canonical assignment)
+                        pieceAssignments[conn.PieceAIndex] = group[0];
+                        assigned = true;
+                        break;
+                    }
+                }
+
+                if (!assigned)
+                {
+                    // Not in any group, assign directly
+                    pieceAssignments[conn.PieceAIndex] = conn.PieceBIndex;
+                }
+            }
+        }
+    }
+
+    private void EvaluateProgressWithAssignments(List<DetectedConnection> connections)
+    {
+        float totalError = 0f;
+        int evaluatedSubtasks = 0;
+        currentIssueIndex = -1;
+        currentPositionError = 0f;
+        currentRotationError = 0f;
+
+        for (int i = 0; i < idealStateData.Subtasks.Count; i++)
+        {
+            float subtaskError = 1f; // Default to full error
+            float positionError = 0f;
+            float rotationError = 0f;
+
+            // Find if this subtask is satisfied by any connection
+            foreach (var conn in connections)
+            {
+                // Check if this connection satisfies the subtask (considering assignments)
+                if (conn.PieceAIndex == i && 
+                   (conn.PieceBIndex == pieceAssignments[i] || 
+                    IsInSameGroup(conn.PieceBIndex, pieceAssignments[i])))
+                {
+                    // Calculate exact errors
+                    positionError = Mathf.Abs(conn.Distance - idealStateData.Subtasks[i].RelativeDistance);
+                    rotationError = Quaternion.Angle(conn.RotationDiff, idealStateData.Subtasks[i].AngleDifference);
+
+                    // Normalize errors
+                    float normPosError = Mathf.Clamp01(positionError / positionTolerance);
+                    float normRotError = Mathf.Clamp01(rotationError / orientationTolerance);
+                    subtaskError = 0.4f * normPosError + 0.6f * normRotError;
+                    break;
+                }
+            }
+
+            // Track the worst error for user feedback
+            if (subtaskError > 0.05f && 
+               (currentIssueIndex == -1 || positionError + rotationError > currentPositionError + currentRotationError))
+            {
+                currentIssueIndex = i;
+                currentPositionError = positionError;
+                currentRotationError = rotationError;
             }
 
             totalError += subtaskError;
+            evaluatedSubtasks++;
         }
-        //Debug.Log("calcu")
 
-        progress = Mathf.Clamp(1f - (totalError / activeFurnitureConfig.SubtaskPiecesA.Count), 0f, 1f);
-        //Debug.Log(progress);
+        progress = evaluatedSubtasks > 0 ? 1f - (totalError / evaluatedSubtasks) : 0f;
         progressBar.value = progress;
         progressText.text = $"Progress: {Mathf.RoundToInt(progress * 100f)}%";
     }
 
-    private void SetSubtaskPieces(List<GameObject> piecesA, List<GameObject> piecesB)
+    private bool IsInSameGroup(int index1, int index2)
     {
-        if (piecesA.Count != piecesB.Count)
+        if (index1 == index2) return true;
+        foreach (var group in groupLookup.Values)
         {
-            Debug.LogError("Subtask pieces count mismatch!");
-            return;
+            if (group.Contains(index1) && group.Contains(index2))
+                return true;
         }
+        return false;
+    }
 
-        Debug.Log("Subtask pieces set for active furniture.");
+    private struct DetectedConnection
+    {
+        public int PieceAIndex;
+        public int PieceBIndex;
+        public int MatchedSubtaskIndex;
+        public float Distance;
+        public Quaternion RotationDiff;
     }
 
     public float GetTaskProgress() => progress;
-    public int GetCurrentSubtaskIndex() => currentSubtaskIndex;
+    public int GetCurrentIssueIndex() => currentIssueIndex;
     public float GetCurrentPositionError() => currentPositionError;
     public float GetCurrentRotationError() => currentRotationError;
 }
