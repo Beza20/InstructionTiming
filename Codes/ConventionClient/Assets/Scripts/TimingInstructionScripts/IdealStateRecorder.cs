@@ -35,6 +35,18 @@ public class IdealStateRecorder : MonoBehaviour
     /// Sets the active furniture configuration by name.
     /// Called by FurnitureManager when the selected furniture changes.
     /// </summary>
+    /// 
+    void Start()
+    {
+        string defaultFurnitureName = "Rashult"; // Change to match your actual config name
+
+        SetActiveFurniture(defaultFurnitureName);
+
+        if (activeConfig != null)
+        {
+            SaveIdealState();
+        }
+    }
     public void SetActiveFurniture(string furnitureName)
     {
         if (FurnitureConfigs == null || FurnitureConfigs.Count == 0)

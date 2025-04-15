@@ -12,6 +12,7 @@ public class ObjectRotationTracker : MonoBehaviour
     }
     
     public float positionDeltaThreshold = 0.01f;  // Acceptable movement in meters
+    public float moving = 0.1f;
 
 
     public List<GameObject> trackedObjects = new List<GameObject>();
@@ -103,7 +104,7 @@ public class ObjectRotationTracker : MonoBehaviour
         if (past != null)
         {
             float distance = Vector3.Distance(obj.transform.position, past.position);
-            return distance > positionDeltaThreshold; // Use your existing threshold
+            return distance > moving; // Use your existing threshold
         }
 
         return false;

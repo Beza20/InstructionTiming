@@ -2,12 +2,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
+
+// using ray cast handler to make the spheres interacting with the glasses
 public class RaycastHandler
 {
     [SerializeField] private float _distance = 10f;
     [SerializeField] private float _width = 0.5f;
     [SerializeField] private LayerMask _layerMask;
 
+    // drawing for debugging
     public static class DebugExtension
     {
         public static void DrawWireSphere(Vector3 center, Color color, float radius, int segments = 20)
@@ -44,14 +47,14 @@ public class RaycastHandler
         HashSet<GameObject> hitObjects = new HashSet<GameObject>();
 
         Vector3 start = origin.position;
-        Vector3 direction = origin.forward;  // Use -forward if needed
+        Vector3 direction = origin.forward;  // played around with making this ngative because the motive rigid body was having issues
         Vector3 end = start + direction * _distance;
 
         // Draw main cast line
         Debug.DrawLine(start, end, Color.green);
 
         // Draw radius circles at start and end
-        DebugExtension.DrawWireSphere(start, Color.cyan, _width); // You’ll need the helper below
+        DebugExtension.DrawWireSphere(start, Color.cyan, _width); 
         DebugExtension.DrawWireSphere(end, Color.cyan, _width);
 
         // Do the cast
@@ -68,7 +71,8 @@ public class RaycastHandler
             hitObjects.Add(hit.collider.transform.root.gameObject);
             if (hit.distance == 0) continue; // likely overlapping at cast start
 
-            // Draw hit point
+
+            // Debugging to see which objects the sphere is hitting
             Debug.DrawLine(hit.point, hit.point + Vector3.up * 0.2f, Color.red);
 
             // Label hit object
@@ -87,7 +91,7 @@ public class RaycastHandler
         Gizmos.DrawWireSphere(endPoint, _width);
     }
 }
-
+// this is the main class for A2
 public class ObjectFacingReturnTrigger : MonoBehaviour
 {
     [Header("Dependencies")]
@@ -97,11 +101,12 @@ public class ObjectFacingReturnTrigger : MonoBehaviour
     [SerializeField] private RaycastHandler _raycastHandler = new RaycastHandler();
 
     [Header("Detection Settings")]
-    [SerializeField] private float _movementThreshold = 0.2f;
+    [SerializeField] private float _movementThreshold = 0.1f;
     [SerializeField] private float _returnThreshold = 0.05f;
     [SerializeField] private float _maxReturnTime = 5f;
     [SerializeField] private float _minReturnTime = 0.7f;
     [SerializeField] private float _triggerCooldown = 10f;
+    [SerializeField] private float _cumulativeThreshold = 0.5f;
 
     private Dictionary<GameObject, float> _lastTriggerTimes = new Dictionary<GameObject, float>();
     private Dictionary<GameObject, (Vector3 dir, float timestamp)> _initialDirections = new Dictionary<GameObject, (Vector3, float)>();
@@ -123,7 +128,7 @@ private Dictionary<GameObject, List<DotHistorySample>> _dotHistory = new();
         var logs = _tracker.GetRotationLogs();
         if (!logs.ContainsKey(_glassesTransform.gameObject)) return;
 
-        // Get objects currently in view
+        // Get objects currently in view of the sphere
         HashSet<GameObject> visibleObjects = _raycastHandler.GetObjectsInSight(_glassesTransform);
 
         foreach (var kvp in logs)
@@ -167,44 +172,44 @@ private Dictionary<GameObject, List<DotHistorySample>> _dotHistory = new();
             if (!_dotHistory.ContainsKey(obj))
                 _dotHistory[obj] = new List<DotHistorySample>();
 
+            //we only care about the dot products of the previous 5 seconds
+
             _dotHistory[obj].Add(new DotHistorySample { timestamp = now, dot = currentDot });
             _dotHistory[obj].RemoveAll(sample => now - sample.timestamp > _maxReturnTime);
 
-            bool returned = false;
-            bool hadDeviation = false;
-            float deviationTime = -1f;
+            // if objects are not moving there's no reason to trigger
+            if (!_tracker.IsObjectMoving(obj)) continue;
 
+            float totalDeviation = 0f;
+            float firstSignificantDeviationTime = -1f;
+
+
+            //checks entire dictionary if significant movement was made over the past 5 seconds
             foreach (var sample in _dotHistory[obj])
             {
                 float delta = Mathf.Abs(sample.dot - currentDot);
-                if (delta < _returnThreshold && deviationTime >= 0f)
+                totalDeviation += delta;
+
+                if (delta > _movementThreshold && firstSignificantDeviationTime < 0f)
                 {
-                    float timeElapsed = now - deviationTime;
-                    if (timeElapsed >= _minReturnTime && timeElapsed <= _maxReturnTime)
-                    {
-                        if (_tracker.IsObjectMoving(obj))
-                        {
-                            returned = true;
-                            break;
-                        }
-                    }
-                }
-                else if (delta > _movementThreshold && deviationTime < 0f)
-                {
-                    deviationTime = sample.timestamp;
-                    hadDeviation = true;
+                    firstSignificantDeviationTime = sample.timestamp;
                 }
             }
 
-            if (returned)
+            bool substantialDeviation = totalDeviation >= _cumulativeThreshold; 
+            bool closeToPastAlignment = Mathf.Abs(currentDot - _dotHistory[obj][0].dot) < _returnThreshold;
+            bool timeOK = firstSignificantDeviationTime > 0 &&
+                        now - firstSignificantDeviationTime >= _minReturnTime &&
+                        now - firstSignificantDeviationTime <= _maxReturnTime;
+
+            //if so trigger
+
+            if (substantialDeviation && closeToPastAlignment && timeOK)
             {
-                Debug.Log($"{obj.name} ✅ TRIGGERED (Returned after deviation)");
-                _lastTriggerTimes[obj] = now;
+                Debug.Log($"{obj.name} 
                 _beepAudio?.Play();
-                _dotHistory[obj].Clear(); // Optional: clear only if one-time return trigger
+                _dotHistory[obj].Clear();
             }
-
-            
         }
     }
 
@@ -216,3 +221,5 @@ private Dictionary<GameObject, List<DotHistorySample>> _dotHistory = new();
         }
     }
 }
+
+ 

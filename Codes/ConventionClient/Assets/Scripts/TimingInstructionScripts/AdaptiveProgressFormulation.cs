@@ -48,9 +48,13 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
     private Dictionary<int, float> subtaskProgress = new Dictionary<int, float>();
     private Dictionary<int, List<int>> groupedSubtasks = new Dictionary<int, List<int>>();
-    private HashSet<int> sequentialGroups = new HashSet<int> { 2 }; // Only group 2 is sequential
+    private HashSet<int> sequentialGroups = new HashSet<int> { 3 }; // Only group 2 is sequential
     private int lastActiveGroup = -1;
     private float lastKnownProgress = 0f;
+    private Dictionary<int, bool> groupSequentialRules = new Dictionary<int, bool>();
+
+    private Transform a;
+    private Transform b;
 
     void Start()
     {
@@ -64,21 +68,31 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
         groupedSubtasks.Clear();
         subtaskProgress.Clear();
+        groupSequentialRules.Clear();
+
+        // Define group sequentiality: true = sequential, false = parallel
+        groupSequentialRules[0] = false;
+        groupSequentialRules[1] = true;
+        groupSequentialRules[2] = false;
+        groupSequentialRules[3] = true; // This group is gated by completion of groups 0–2
 
         for (int i = 0; i < idealStateData.Subtasks.Count; i++)
         {
             var subtask = idealStateData.Subtasks[i];
 
             // Hardcoded group assignment logic
-            if (i <= 3) { subtask.GroupID = 0; subtask.MustBeSequential = false; }
-            else if (i <= 5) { subtask.GroupID = 1; subtask.MustBeSequential = false; }
-            else { subtask.GroupID = 2; subtask.MustBeSequential = true; }
+            if (i <= 2) { subtask.GroupID = 0; subtask.MustBeSequential = false; }
+            else if (i <= 4) { subtask.GroupID = 1; subtask.MustBeSequential = false; }
+            else if (i <= 6) { subtask.GroupID = 2; subtask.MustBeSequential = false; }
+            else { subtask.GroupID = 3; subtask.MustBeSequential = true; }
 
             if (!groupedSubtasks.ContainsKey(subtask.GroupID))
                 groupedSubtasks[subtask.GroupID] = new List<int>();
 
             groupedSubtasks[subtask.GroupID].Add(i);
             subtaskProgress[i] = 0f;
+
+            
         }
     }
 
@@ -114,7 +128,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         float groupProgress = EvaluateGroupProgress(activeGroup);
         lastKnownProgress = groupProgress;
         lastActiveGroup = activeGroup;
-        Debug.Log("progress in calculate: " + groupProgress);
+        //Debug.Log("progress in calculate: " + groupProgress);
         return groupProgress;
     }
 
@@ -127,15 +141,47 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         {
             groupProgress += EvaluateSubtask(i);
         }
-        Debug.Log("group progreess: " + groupProgress/subtaskIndices.Count);
+        //Debug.Log("group progreess: " + groupProgress/subtaskIndices.Count);
 
         return groupProgress / subtaskIndices.Count;
     }
 
     float EvaluateSubtask(int index)
     {
-        Transform a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
-        Transform b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
+        // Transform a;
+        // Transform b;
+        if (index == 0){
+            if(movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index]))
+            {
+                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
+            }
+            else if (!movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index])){
+                a = activeFurnitureConfig.SubtaskPiecesA[index + 1].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
+            }
+            else {
+                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index + 1].transform;
+
+            }
+        }
+        if (index == 1){
+            if(movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index]))
+            {
+                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
+            }
+            else if (!movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index])){
+                a = activeFurnitureConfig.SubtaskPiecesA[index - 1].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
+            }
+            else {
+                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
+                b = activeFurnitureConfig.SubtaskPiecesB[index - 1].transform;
+
+            }
+        }
 
         Vector3 r_ij = b.position - a.position;
         float distError = Mathf.Abs(r_ij.magnitude - idealStateData.Subtasks[index].RelativeDistance);

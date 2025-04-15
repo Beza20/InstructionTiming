@@ -1271,6 +1271,7 @@ MonoBehaviour:
   _maxReturnTime: 5
   _minReturnTime: 0.7
   _triggerCooldown: 3
+  _cumulativeThreshold: 0.5
 --- !u!1 &189353306 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 124320796340252293, guid: 459de514481d8d343ada330111f6a9de, type: 3}
@@ -10055,7 +10056,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1647333940
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10070,7 +10071,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   FurnitureConfigs:
   - FurnitureName: Rashult
-    IdealStateFile: {fileID: 4900000, guid: 5175405f55b2a134785e648dc21bda2d, type: 3}
+    IdealStateFile: {fileID: 4900000, guid: 806fb638f6950b946aaea6dfc0320e01, type: 3}
     SubtaskPiecesA:
     - {fileID: 5939484379313198080}
     - {fileID: 327668502381708629}
@@ -10474,7 +10475,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1727252492
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12011,8 +12012,8 @@ MonoBehaviour:
   A2: {fileID: 180236377}
   B: {fileID: 1647333939}
   isA1Active: 0
-  isA2Active: 1
-  isBActive: 0
+  isA2Active: 0
+  isBActive: 1
 --- !u!4 &2011760710
 Transform:
   m_ObjectHideFlags: 0
@@ -12255,6 +12256,96 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2052984473}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2070630517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2070630519}
+  - component: {fileID: 2070630518}
+  m_Layer: 0
+  m_Name: rashltProgress
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2070630518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2070630517}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b99d69328daee6a4ab50a4ad1b319f57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  idealStateFile: {fileID: 4900000, guid: 806fb638f6950b946aaea6dfc0320e01, type: 3}
+  subtaskPieces:
+  - pieceA: {fileID: 5939484379313198080}
+    pieceB: {fileID: 2920684368312283873}
+  - pieceA: {fileID: 327668502381708629}
+    pieceB: {fileID: 5701478547298740967}
+  - pieceA: {fileID: 5618645776369428615}
+    pieceB: {fileID: 5701478547298740967}
+  - pieceA: {fileID: 367384578329832728}
+    pieceB: {fileID: 327668502381708629}
+  - pieceA: {fileID: 6540778297243898410}
+    pieceB: {fileID: 5618645776369428615}
+  - pieceA: {fileID: 3838084942269149650}
+    pieceB: {fileID: 367384578329832728}
+  - pieceA: {fileID: 1423550380}
+    pieceB: {fileID: 367384578329832728}
+  - pieceA: {fileID: 1170123312}
+    pieceB: {fileID: 3838084942269149650}
+  - pieceA: {fileID: 913216912}
+    pieceB: {fileID: 6540778297243898410}
+  connectionRules:
+  - subtaskID1: 1
+    subtaskID2: 2
+    mustBeSameType: 0
+    mustBeDifferentType: 1
+    requiredCompletedSubtasks: 
+    description: 
+  - subtaskID1: 3
+    subtaskID2: 4
+    mustBeSameType: 0
+    mustBeDifferentType: 1
+    requiredCompletedSubtasks: 0100000002000000
+    description: 
+  - subtaskID1: 5
+    subtaskID2: 6
+    mustBeSameType: 0
+    mustBeDifferentType: 1
+    requiredCompletedSubtasks: 0100000002000000
+    description: 
+  progressSlider: {fileID: 801354882}
+  progressText: {fileID: 511796189}
+  movementTracker: {fileID: 1809032991}
+  positionWeight: 0.5
+  rotationWeight: 0.5
+  positionThreshold: 0.1
+  rotationThreshold: 5
+--- !u!4 &2070630519
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2070630517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2.2257757, y: -2.6212275, z: -6.1263776}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2094360039
 GameObject:
@@ -14779,3 +14870,4 @@ SceneRoots:
   - {fileID: 842450127}
   - {fileID: 423335671}
   - {fileID: 1647333941}
+  - {fileID: 2070630519}
