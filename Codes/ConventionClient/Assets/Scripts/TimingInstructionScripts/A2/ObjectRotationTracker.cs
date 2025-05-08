@@ -10,9 +10,11 @@ public class ObjectRotationTracker : MonoBehaviour
         public Vector3 position;
         public float timestamp;
     }
+    [SerializeField] private Transform _glassesTransform;
+
     
     public float positionDeltaThreshold = 0.01f;  // Acceptable movement in meters
-    public float moving = 0.1f;
+    public float moving = 1f;
 
 
     public List<GameObject> trackedObjects = new List<GameObject>();
@@ -20,6 +22,8 @@ public class ObjectRotationTracker : MonoBehaviour
 
     private Dictionary<GameObject, List<RotationHistory>> rotationLogs = new();
     private float timer = 0f;
+
+    
 
     void Start()
     {
@@ -84,7 +88,46 @@ public class ObjectRotationTracker : MonoBehaviour
         return true;
     }
 
-    public bool IsObjectMoving(GameObject obj, float windowSeconds = 1f)
+    public bool AreObjectsStillA1(float windowSeconds)
+    {
+        float now = Time.time;
+        var logs = GetRotationLogs();
+
+        foreach (var kvp in logs)
+        {
+            // Skip objects with the "Glasses" tag
+            GameObject obj = kvp.Key;
+            if (obj == _glassesTransform.gameObject) continue;
+
+            List<ObjectRotationTracker.RotationHistory> history = kvp.Value;
+            ObjectRotationTracker.RotationHistory past = null;
+            bool foundPast = false;
+
+            // Find the first log entry older than the time window
+            for (int i = history.Count - 1; i >= 0; i--)
+            {
+                if (now - history[i].timestamp >= windowSeconds)
+                {
+                    past = history[i];
+                    foundPast = true;
+                    break;
+                }
+            }
+
+            // Check position change if history exists
+            if (foundPast)
+            {
+                float distance = Vector3.Distance(kvp.Key.transform.position, past.position);
+                if (distance > positionDeltaThreshold)
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+
+    public bool IsObjectMoving(GameObject obj, float windowSeconds = 1.5f)
     {
         float now = Time.time;
         if (!rotationLogs.ContainsKey(obj)) return false;
@@ -105,6 +148,31 @@ public class ObjectRotationTracker : MonoBehaviour
         {
             float distance = Vector3.Distance(obj.transform.position, past.position);
             return distance > moving; // Use your existing threshold
+        }
+
+        return false;
+    }
+    public bool IsObjectMovingA2(GameObject obj, float windowSeconds = 2f)
+    {
+        float now = Time.time;
+        if (!rotationLogs.ContainsKey(obj)) return false;
+
+        var history = rotationLogs[obj];
+        ObjectRotationTracker.RotationHistory past = null;
+
+        for (int i = history.Count - 1; i >= 0; i--)
+        {
+            if (now - history[i].timestamp >= windowSeconds)
+            {
+                past = history[i];
+                break;
+            }
+        }
+
+        if (past != null)
+        {
+            float angulardiff = Quaternion.Angle(obj.transform.rotation, past.rotation);
+            return angulardiff > 7f; // Use your existing threshold
         }
 
         return false;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Linq;
 
 public class AdaptiveProgressFormulation : MonoBehaviour
 {
@@ -48,13 +49,18 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
     private Dictionary<int, float> subtaskProgress = new Dictionary<int, float>();
     private Dictionary<int, List<int>> groupedSubtasks = new Dictionary<int, List<int>>();
-    private HashSet<int> sequentialGroups = new HashSet<int> { 3 }; // Only group 2 is sequential
+    private HashSet<int> sequentialGroups = new HashSet<int> {1, 3 }; // Only group 3 subtasks must be  sequential
     private int lastActiveGroup = -1;
     private float lastKnownProgress = 0f;
     private Dictionary<int, bool> groupSequentialRules = new Dictionary<int, bool>();
 
     private Transform a;
     private Transform b;
+    private float startDelay = 6f;
+    private float elapsedTime = 0f;
+    private bool started = false;
+    private float groupProgress = 0;
+    private Dictionary<int, float> completedGroups = new Dictionary<int, float>();
 
     void Start()
     {
@@ -72,8 +78,8 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
         // Define group sequentiality: true = sequential, false = parallel
         groupSequentialRules[0] = false;
-        groupSequentialRules[1] = true;
-        groupSequentialRules[2] = false;
+        groupSequentialRules[1] = true; // this group must be done only if 0 is completed
+        groupSequentialRules[2] = false; // this group can be done first
         groupSequentialRules[3] = true; // This group is gated by completion of groups 0–2
 
         for (int i = 0; i < idealStateData.Subtasks.Count; i++)
@@ -81,9 +87,9 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             var subtask = idealStateData.Subtasks[i];
 
             // Hardcoded group assignment logic
-            if (i <= 2) { subtask.GroupID = 0; subtask.MustBeSequential = false; }
-            else if (i <= 4) { subtask.GroupID = 1; subtask.MustBeSequential = false; }
-            else if (i <= 6) { subtask.GroupID = 2; subtask.MustBeSequential = false; }
+            if (i < 2) { subtask.GroupID = 0; subtask.MustBeSequential = false; }
+            else if (i < 4) { subtask.GroupID = 1; subtask.MustBeSequential = false; }
+            else if (i < 6) { subtask.GroupID = 2; subtask.MustBeSequential = false; }
             else { subtask.GroupID = 3; subtask.MustBeSequential = true; }
 
             if (!groupedSubtasks.ContainsKey(subtask.GroupID))
@@ -98,6 +104,18 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
     void Update()
     {
+        if (!started)
+        {
+            elapsedTime += Time.deltaTime;
+            if (elapsedTime >= startDelay)
+            {
+                started = true;
+            }
+            else
+            {
+                return; // wait until 6 seconds have passed
+            }
+        }
         float totalProgress = CalculateProgress();
         progressBar.value = totalProgress;
         progressText.text = $"Progress: {(totalProgress * 100f):F1}%";
@@ -106,15 +124,45 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     float CalculateProgress()
     {
         int activeGroup = GetActiveGroup();
-        if (activeGroup == -1) return 0f;
         Debug.Log($"Active group: {activeGroup}");
-
-        if (activeGroup == -1)
+        // First, check if any groups are now complete (regardless of active group)
+        for (int groupID = 0; groupID < groupedSubtasks.Count; groupID++)
         {
-            // Return cached value if user isn't actively moving anything
+            if (IsGroupComplete(groupID) && !completedGroups.ContainsKey(groupID))
+            {
+                float groupScore = EvaluateGroupProgress(groupID);
+                completedGroups[groupID] = groupScore;
+                Debug.Log($"Group {groupID} completed with progress {groupScore:F2}!");
+            }
+
+        }
+        // Sum progress of all completed groups (0 if none)
+        float completedGroupsProgress = completedGroups.Values.Sum() / groupedSubtasks.Count;
+        
+        if (activeGroup == -1) 
+        {
+            if (lastKnownProgress == 0)
+            {
+                
+                groupProgress = completedGroupsProgress + EvaluateGroupProgress(0);
+                lastKnownProgress = groupProgress;
+                lastActiveGroup = activeGroup;
+                Debug.Log("progress in group 0");
+                
+                return groupProgress;
+
+            }   
+            
+            else
+            {
+                return lastKnownProgress;
+            }
+        } 
+        if (activeGroup == 1 && !IsGroupComplete(0))
+        {
             return lastKnownProgress;
         }
-
+       
         // Enforce sequential dependency
         if (sequentialGroups.Contains(activeGroup))
         {
@@ -124,10 +172,14 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                     return lastKnownProgress;
             }
         }
+        if (!completedGroups.ContainsKey(activeGroup)){
+            groupProgress = EvaluateGroupProgress(activeGroup);
+            lastKnownProgress = groupProgress;
+            lastActiveGroup = activeGroup;
 
-        float groupProgress = EvaluateGroupProgress(activeGroup);
-        lastKnownProgress = groupProgress;
-        lastActiveGroup = activeGroup;
+        }
+
+        groupProgress += completedGroupsProgress;
         //Debug.Log("progress in calculate: " + groupProgress);
         return groupProgress;
     }
@@ -136,58 +188,114 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     {
         float groupProgress = 0f;
         var subtaskIndices = groupedSubtasks[groupID];
+        bool mustBeSequential = groupSequentialRules.ContainsKey(groupID) && groupSequentialRules[groupID];
 
-        foreach (int i in subtaskIndices)
+        for (int i = 0; i < subtaskIndices.Count; i++)
         {
-            groupProgress += EvaluateSubtask(i);
+            int index = subtaskIndices[i];
+        
+
+            if (idealStateData.Subtasks[index].MustBeSequential && i > 0)
+            {
+                Debug.Log("checking if mustbe sequential works");
+                int prevIndex = subtaskIndices[i - 1];
+                if (subtaskProgress[prevIndex] < 1f)
+                    break; // stop if previous one in sequence is not complete
+            }
+
+            groupProgress += EvaluateSubtask(index);
         }
-        //Debug.Log("group progreess: " + groupProgress/subtaskIndices.Count);
+        //Debug.Log("when group progress computes " + groupProgress);
 
         return groupProgress / subtaskIndices.Count;
     }
 
+    (bool found, Transform a, Transform b) GetBestTransformPair(int index)
+    {
+        GameObject candidateA = activeFurnitureConfig.SubtaskPiecesA[index];
+        GameObject candidateB = activeFurnitureConfig.SubtaskPiecesB[index];
+        GameObject candidateA1 = activeFurnitureConfig.SubtaskPiecesA[index + 1];
+        GameObject candidateB1 = activeFurnitureConfig.SubtaskPiecesB[index + 1];
+
+
+        bool aMoving = IsMoving(candidateA);
+        bool bMoving = IsMoving(candidateB);
+        bool a1Moving = IsMoving(candidateA1);
+        bool b1Moving = IsMoving(candidateB1);
+
+
+        if (aMoving && bMoving)
+        {
+            return (true, candidateA.transform, candidateB.transform);
+        }
+
+        if (aMoving && !bMoving && b1Moving)
+        {
+            return (true, candidateA.transform, candidateB1.transform);
+        }
+        // Check nearby options to accommodate interchangeability
+        float bestScore = float.MaxValue;
+        Transform bestA = candidateA.transform;
+        Transform bestB = candidateB.transform;
+        float distErrorBest = Mathf.Abs((bestB.position - bestA.position).magnitude - idealStateData.Subtasks[index].RelativeDistance);
+        float rotErrorBest = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(Quaternion.Inverse(bestA.rotation) * bestB.rotation, idealStateData.Subtasks[index].AngleDifference)));
+
+        bestScore = distErrorBest + rotErrorBest;
+        bool found = false;
+        int aIndex = index;
+        int bIndex = index;
+
+        int offset = 1; // allow checking adjacent indices
+        if (index == 0)
+        {
+            aIndex = index;
+            bIndex = index + offset;
+
+        }
+        if (index == 1)
+        {
+            aIndex = index - offset;
+            bIndex = index;
+        }
+        
+
+        if (aIndex >= 0 && aIndex < activeFurnitureConfig.SubtaskPiecesA.Count &&
+            bIndex >= 0 && bIndex < activeFurnitureConfig.SubtaskPiecesB.Count)
+        {
+            Transform aTry = activeFurnitureConfig.SubtaskPiecesA[aIndex].transform;
+            Transform bTry = activeFurnitureConfig.SubtaskPiecesB[bIndex].transform;
+
+            float distError = Mathf.Abs((bTry.position - aTry.position).magnitude - idealStateData.Subtasks[index].RelativeDistance);
+            float rotError = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(Quaternion.Inverse(aTry.rotation) * bTry.rotation, idealStateData.Subtasks[index].AngleDifference)));
+
+            float totalScore = distError + rotError;
+            Debug.Log("best score " + bestScore);
+            Debug.Log("total score " + totalScore);
+
+            if (totalScore < bestScore)
+            {
+                Debug.Log("doing the alternative");
+                bestScore = totalScore;
+                bestA = aTry;
+                bestB = bTry;
+                found = true;
+            }
+        }
+        found = true;
+        return (found, bestA, bestB);
+    }
+
     float EvaluateSubtask(int index)
     {
-        // Transform a;
-        // Transform b;
-        if (index == 0){
-            if(movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index]))
-            {
-                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
-            }
-            else if (!movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index])){
-                a = activeFurnitureConfig.SubtaskPiecesA[index + 1].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
-            }
-            else {
-                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index + 1].transform;
+        var (found, aTransform, bTransform) = GetBestTransformPair(index);
+        if (!found) return subtaskProgress[index]; // fallback to cached if nothing suitable
+        Debug.Log("found is true");
 
-            }
-        }
-        if (index == 1){
-            if(movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index]))
-            {
-                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
-            }
-            else if (!movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesA[index]) && movementTracker.IsObjectMoving(activeFurnitureConfig.SubtaskPiecesB[index])){
-                a = activeFurnitureConfig.SubtaskPiecesA[index - 1].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index].transform;
-            }
-            else {
-                a = activeFurnitureConfig.SubtaskPiecesA[index].transform;
-                b = activeFurnitureConfig.SubtaskPiecesB[index - 1].transform;
-
-            }
-        }
-
-        Vector3 r_ij = b.position - a.position;
+        Vector3 r_ij = bTransform.position - aTransform.position;
         float distError = Mathf.Abs(r_ij.magnitude - idealStateData.Subtasks[index].RelativeDistance);
         float posPenalty = Mathf.Max(0f, distError - epsilonP) / (deltaPMax - epsilonP);
 
-        Quaternion q_ij = Quaternion.Inverse(a.rotation) * b.rotation;
+        Quaternion q_ij = Quaternion.Inverse(aTransform.rotation) * bTransform.rotation;
         Quaternion q_goal = idealStateData.Subtasks[index].AngleDifference;
         float rotError = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(q_ij, q_goal)));
         float rotPenalty = Mathf.Max(0f, rotError - epsilonQ) / (1f - epsilonQ);
@@ -195,39 +303,68 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         float progress = 1f - (wP * posPenalty + wQ * rotPenalty);
         progress = Mathf.Clamp01(progress);
 
-        // 🔍 DEBUG LOGGING
-        //Debug.Log($"Subtask {index} | distError: {distError:F4}, posPenalty: {posPenalty:F4}, rotError: {rotError:F4}, rotPenalty: {rotPenalty:F4}, progress: {progress:F4}");
-
-
         subtaskProgress[index] = progress;
+        Debug.Log("checking subtaskProgress " + subtaskProgress[index]);
         return progress;
     }
+
 
     bool IsGroupComplete(int groupID)
     {
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
-            if (subtaskProgress[i] < 1f)
+            if (subtaskProgress[i] < 0.7f)
+                
                 return false;
         }
+        Debug.Log("group is complete: " + groupID);
         return true;
     }
+    
 
-    int GetActiveGroup()
+   int GetActiveGroup()
     {
-        for (int groupID = 0; groupID <= 2; groupID++)
+        foreach (var kvp in groupedSubtasks)
         {
-            foreach (int subtaskIndex in groupedSubtasks[groupID])
+            int groupID = kvp.Key;
+            foreach (int subtaskIndex in kvp.Value)
             {
+
                 var pieceA = activeFurnitureConfig.SubtaskPiecesA[subtaskIndex];
                 var pieceB = activeFurnitureConfig.SubtaskPiecesB[subtaskIndex];
 
+
                 if (IsMoving(pieceA) || IsMoving(pieceB))
+                {
+                    if(IsMoving(pieceA) )
+                    {
+                        Debug.Log(pieceA.ToString() + "is moving");
+                    }
+                    if(IsMoving(pieceB) )
+                    {
+                        Debug.Log(pieceB.ToString() + "is moving");
+                    }
+
+                    if (subtaskIndex == 2 || subtaskIndex == 3)
+                    {
+                        if (IsMoving(pieceA) && IsGroupComplete(0))
+                        {
+                            return groupID;
+                        }
+                        else
+                        {
+                            Debug.Log("group is not complete");
+                            return groupID + 1;
+                        }
+
+                    } 
+                    
                     return groupID;
+                }
             }
         }
-        return 0; // Nothing currently moving
+        return -1;
     }
 
     bool IsMoving(GameObject obj)
