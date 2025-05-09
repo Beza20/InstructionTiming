@@ -10,11 +10,13 @@ public class MovementTrigger : MonoBehaviour
     [SerializeField] private MovementTracker movementTracker;
     [SerializeField] private ObjectRotationTracker objectTracker;
     [SerializeField] private AudioSource beepAudio;
+    [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+   
 
     [Header("Timing Settings")]
     [SerializeField] private float requiredDuration = 2.0f;   // How long conditions must stay true
     [SerializeField] private float gracePeriod = 0.3f;      // Brief interruptions allowed
-    [SerializeField] private float cooldownDuration = 1.0f; // Prevent rapid retriggering
+    [SerializeField] private float cooldownDuration = 3.0f; // Prevent rapid retriggering
 
     [SerializeField] private Transform _glassesTransform;
 
@@ -105,7 +107,9 @@ public class MovementTrigger : MonoBehaviour
     private void TriggerAction()
     {
         _canTrigger = false;
-        beepAudio.Play();
+        //beepAudio.Play();
+         instructionPlayer?.OnTriggerEvent();
+
         Invoke(nameof(ResetTrigger), cooldownDuration);
     }
 

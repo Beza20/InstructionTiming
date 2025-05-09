@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;  // Required for handling UI elements (Checkboxes)
+using System.Collections.Generic;
 
 public class TriggerManager : MonoBehaviour
 {
@@ -53,4 +54,23 @@ public class TriggerManager : MonoBehaviour
         isBActive = value;
         UpdateGameObjectStates();
     }
+
+    
+
+    public List<MonoBehaviour> GetActiveTriggerScripts()
+    {
+        List<MonoBehaviour> activeTriggers = new List<MonoBehaviour>();
+
+        if (isA1Active && A1 != null)
+            activeTriggers.AddRange(A1.GetComponents<MonoBehaviour>());
+
+        if (isA2Active && A2 != null)
+            activeTriggers.AddRange(A2.GetComponents<MonoBehaviour>());
+
+        if (isBActive && B != null)
+            activeTriggers.AddRange(B.GetComponents<MonoBehaviour>());
+
+        return activeTriggers;
+    }
+
 }

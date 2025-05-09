@@ -12,6 +12,8 @@ public class A2TriggerSimplified : MonoBehaviour
     [SerializeField] private AudioSource beepAudio;
     [SerializeField] private AudioSource beepAudioV2;
     [SerializeField] private ConecastHandling _conecastHandler;
+    [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+
 
     [Header("Trigger States")]
     public bool isRotating = false;  // State for A1 GameObject (Checkbox)
@@ -230,7 +232,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         returnTimestamps[obj].Add(now);
 
                         // Play beep
-                        if (beepAudio != null) beepAudio.Play();
+                        instructionPlayer?.OnTriggerEvent();
 
                         // Set cooldown
                         _lastTriggerTimes[obj] = now;
@@ -241,7 +243,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         
                         // Play beep
                         Debug.Log("posdiff " + pos_diff + "pos diff seen " + k + " return at " + i);
-                        if (beepAudioV2 != null) beepAudioV2.Play();
+                        instructionPlayer?.OnTriggerEvent();
                         _lastTriggerTimes[obj] = now;
                         break; 
 

@@ -62,6 +62,8 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     private float groupProgress = 0;
     private Dictionary<int, float> completedGroups = new Dictionary<int, float>();
 
+
+
     void Start()
     {
         LoadIdealState(FurnitureConfigs[0]);
@@ -184,7 +186,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         return groupProgress;
     }
 
-    float EvaluateGroupProgress(int groupID)
+    public float EvaluateGroupProgress(int groupID)
     {
         float groupProgress = 0f;
         var subtaskIndices = groupedSubtasks[groupID];
@@ -314,16 +316,33 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
-            if (subtaskProgress[i] < 0.7f)
+            if (subtaskProgress[i] < 0.7f){
                 
                 return false;
+            }
+           
         }
         Debug.Log("group is complete: " + groupID);
         return true;
     }
+    public bool IsSubtaskComplete(int groupID)
+    {
+        var subtaskIndices = groupedSubtasks[groupID];
+        foreach (int i in subtaskIndices)
+        {
+            if (subtaskProgress[i] < 0.7f){
+                
+                return true;
+            }
+           
+        }
+        Debug.Log("group is complete: " + groupID);
+        return false;
+
+    }
     
 
-   int GetActiveGroup()
+   public int GetActiveGroup()
     {
         foreach (var kvp in groupedSubtasks)
         {
