@@ -14,6 +14,10 @@ public class TriggerInstructionPlayer : MonoBehaviour
     public void OnTriggerEvent()
     {
         int group = progressScript.GetActiveGroup();
+        if (group == -1)
+        {
+            group = 0;
+        }
         if (group < 0 || group >= NumGroups) return;
 
         // Determine which clip to play
@@ -32,11 +36,13 @@ public class TriggerInstructionPlayer : MonoBehaviour
             bool anySubtaskComplete = progressScript.IsSubtaskComplete(group);
             if (anySubtaskComplete && triggerCounts[group] == 1)
             {
+                Debug.Log("could it be");
                 clipToPlay = baseInstructions[group]; // replay base
                 triggerCounts[group]++;
             }
             else
             {
+                Debug.Log("doing this");
                 clipToPlay = detailedInstructions[group]; // escalate
             }
         }

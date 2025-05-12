@@ -52,7 +52,7 @@ public class MovementRecorderCSVLogger : MonoBehaviour
         }
 
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string fileName = $"movements_AutoSession_{timestamp}.csv";
+        string fileName = $"Objectmovement_recording_{timestamp}.csv";
 
         string folderPath = Path.Combine(Application.persistentDataPath, "csv_logs");
         if (!Directory.Exists(folderPath))

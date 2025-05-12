@@ -11,6 +11,7 @@ public class MovementTrigger : MonoBehaviour
     [SerializeField] private ObjectRotationTracker objectTracker;
     [SerializeField] private AudioSource beepAudio;
     [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+    [SerializeField] private TriggerManagerCoordinator interviewManager;
    
 
     [Header("Timing Settings")]
@@ -19,7 +20,7 @@ public class MovementTrigger : MonoBehaviour
     [SerializeField] private float cooldownDuration = 3.0f; // Prevent rapid retriggering
 
     [SerializeField] private Transform _glassesTransform;
-
+    
     // State tracking
     private bool _canTrigger = true;
     private float _conditionMetTime = 0f;
@@ -108,8 +109,7 @@ public class MovementTrigger : MonoBehaviour
     {
         _canTrigger = false;
         //beepAudio.Play();
-         instructionPlayer?.OnTriggerEvent();
-
+        interviewManager?.TriggerInterview("A1");
         Invoke(nameof(ResetTrigger), cooldownDuration);
     }
 

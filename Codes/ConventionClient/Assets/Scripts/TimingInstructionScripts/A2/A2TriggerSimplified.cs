@@ -13,6 +13,7 @@ public class A2TriggerSimplified : MonoBehaviour
     [SerializeField] private AudioSource beepAudioV2;
     [SerializeField] private ConecastHandling _conecastHandler;
     [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+    [SerializeField] private TriggerManagerCoordinator interviewManager;
 
 
     [Header("Trigger States")]
@@ -75,6 +76,7 @@ public class A2TriggerSimplified : MonoBehaviour
         {
             visiblOBj.text += piece.name + "\n";
         }
+        rotate.text = "";
         foreach (var kvp in logs)
         {
             GameObject obj = kvp.Key;
@@ -89,7 +91,7 @@ public class A2TriggerSimplified : MonoBehaviour
             {
                 _lastTriggerTimes[obj] = -_triggerCooldown;
             }
-            rotate.text = (now - _lastTriggerTimes[obj]).ToString();
+            rotate.text += (now - _lastTriggerTimes[obj]).ToString() + "\n";
 
             // Check cooldown
             if (now - _lastTriggerTimes[obj] < _triggerCooldown)
@@ -146,30 +148,31 @@ public class A2TriggerSimplified : MonoBehaviour
                 move.text = "nothing is moving";
                 move.color = Color.red;
             }
-            if (!_tracker.IsObjectMovingA2(obj)) 
-            {
-                // rotate.text = "nothing is rotating";
-                // rotate.color = Color.red;
-                if (isRotating)
-                {
-                    continue;
-                }
+            // if (!_tracker.IsObjectMovingA2(obj)) 
+            // {
+            //     // rotate.text = "nothing is rotating";
+            //     // rotate.color = Color.red;
+            //     if (isRotating)
+            //     {
+            //         continue;
+            //     }
                 
-            }
-            if (!_tracker.IsObjectMoving(obj)) 
-            {
-                // move.text = "nothing is moving";
-                // move.color = Color.red;
-                if (isShifting)
-                {
-                    continue;
-                }
-            }
+            // }
+            // if (!_tracker.IsObjectMoving(obj)) 
+            // {
+            //     // move.text = "nothing is moving";
+            //     // move.color = Color.red;
+            //     if (isShifting)
+            //     {
+            //         continue;
+            //     }
+            // }
 
            
 
             
             // Check history for return patterns
+            Debug.Log("checking history");
             bool hasDeviated = false;
             bool hasMoved = false;
             var history = _qtrHistory[obj];
@@ -231,8 +234,8 @@ public class A2TriggerSimplified : MonoBehaviour
                             returnTimestamps[obj] = new List<float>();
                         returnTimestamps[obj].Add(now);
 
-                        // Play beep
-                        instructionPlayer?.OnTriggerEvent();
+                        // Start interview instead of playing instruction immediately
+                        interviewManager?.TriggerInterview("A2");
 
                         // Set cooldown
                         _lastTriggerTimes[obj] = now;
@@ -243,7 +246,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         
                         // Play beep
                         Debug.Log("posdiff " + pos_diff + "pos diff seen " + k + " return at " + i);
-                        instructionPlayer?.OnTriggerEvent();
+                        interviewManager?.TriggerInterview("A2");
                         _lastTriggerTimes[obj] = now;
                         break; 
 

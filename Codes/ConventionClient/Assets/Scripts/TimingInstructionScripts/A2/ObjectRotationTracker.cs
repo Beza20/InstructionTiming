@@ -22,6 +22,8 @@ public class ObjectRotationTracker : MonoBehaviour
 
     private Dictionary<GameObject, List<RotationHistory>> rotationLogs = new();
     private float timer = 0f;
+    private Dictionary<GameObject, Queue<float>> rotationDeltas = new();
+    private Dictionary<GameObject, float> rotationSums = new();
 
     
 
@@ -152,31 +154,41 @@ public class ObjectRotationTracker : MonoBehaviour
 
         return false;
     }
-    public bool IsObjectMovingA2(GameObject obj, float windowSeconds = 2f)
+    public bool IsObjectMovingA2(GameObject obj, float windowSeconds = 1f, float thresholdDegrees = 5f)
     {
         float now = Time.time;
         if (!rotationLogs.ContainsKey(obj)) return false;
 
+        // Initialize if needed
+        if (!rotationDeltas.ContainsKey(obj))
+        {
+            rotationDeltas[obj] = new Queue<float>();
+            rotationSums[obj] = 0f;
+        }
+
         var history = rotationLogs[obj];
-        ObjectRotationTracker.RotationHistory past = null;
+        if (history.Count < 2) return false;
 
-        for (int i = history.Count - 1; i >= 0; i--)
+        // Remove old history
+        history.RemoveAll(h => now - h.timestamp > windowSeconds);
+
+        // Get last recorded sample
+        var latest = history[^1];
+        var previous = history[0];
+
+        // Compute total cumulative rotation
+        float totalRotation = 0f;
+        for (int i = 1; i < history.Count; i++)
         {
-            if (now - history[i].timestamp >= windowSeconds)
-            {
-                past = history[i];
-                break;
-            }
+            totalRotation += Quaternion.Angle(history[i - 1].rotation, history[i].rotation);
         }
 
-        if (past != null)
-        {
-            float angulardiff = Quaternion.Angle(obj.transform.rotation, past.rotation);
-            return angulardiff > 7f; // Use your existing threshold
-        }
+        // Update cache (optional)
+        rotationSums[obj] = totalRotation;
 
-        return false;
+        return totalRotation > thresholdDegrees;
     }
+
 
     public RotationHistory GetClosestSnapshot(GameObject obj, float targetTimestamp)
     {

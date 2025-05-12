@@ -23,8 +23,11 @@ public class TriggerManagerCoordinator : MonoBehaviour
     private string responseQ2 = "";
     private int questionIndex = 0;
     private string currentTriggerSource = "";
+    
 
     [SerializeField] private TriggerManager triggerManager;
+    [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+
 
     private List<MonoBehaviour> triggerScripts = new List<MonoBehaviour>();
 
@@ -76,8 +79,14 @@ public class TriggerManagerCoordinator : MonoBehaviour
             questionAudioSource.Stop();
             yesButton.gameObject.SetActive(false);
             noButton.gameObject.SetActive(false);
-            ResumeTriggers();
+
             LogResponses();
+            ResumeTriggers();
+
+            if (responseQ2 == "Yes")
+            {
+                instructionPlayer?.OnTriggerEvent(); // ✅ only if Q2 is "Yes"
+            }
         }
     }
 

@@ -330,7 +330,8 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
-            if (subtaskProgress[i] < 0.7f){
+            Debug.Log("subtaskprogress is " + subtaskProgress[i]);
+            if (subtaskProgress[i] > 0.7f){
                 
                 return true;
             }
