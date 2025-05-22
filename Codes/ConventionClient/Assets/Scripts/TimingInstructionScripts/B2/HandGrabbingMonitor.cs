@@ -11,10 +11,10 @@ public class HandGrabbingMonitor : MonoBehaviour
     [SerializeField] private List<GameObject> furniturePieces;
 
     [Header("Grab Settings")]
-    [SerializeField] private float grabDistanceThreshold = 0.12f;
+    [SerializeField] private float grabDistanceThreshold = 0.004f;
 
-    public GameObject grabbedByLeftHand { get; private set; }
-    public GameObject grabbedByRightHand { get; private set; }
+    public List<GameObject> grabbedByLeftHand { get; private set; } = new List<GameObject>();
+    public List<GameObject> grabbedByRightHand { get; private set; } = new List<GameObject>();
 
     void Update()
     {
@@ -23,28 +23,55 @@ public class HandGrabbingMonitor : MonoBehaviour
         Vector3 leftHandPos = leftHandRigidbody.position;
         Vector3 rightHandPos = rightHandRigidbody.position;
 
-        grabbedByLeftHand = DetectClosestGrabbedObject(leftHandPos);
-        grabbedByRightHand = DetectClosestGrabbedObject(rightHandPos);
+        grabbedByLeftHand = DetectGrabbedObjects(leftHandPos);
+        grabbedByRightHand = DetectGrabbedObjects(rightHandPos);
     }
 
-    private GameObject DetectClosestGrabbedObject(Vector3 handPosition)
+    private List<GameObject> DetectGrabbedObjects(Vector3 handPosition)
     {
-        foreach (GameObject obj in furniturePieces)
+        List<GameObject> grabbedObjects = new List<GameObject>();
+
+        Collider[] hits = Physics.OverlapSphere(handPosition, grabDistanceThreshold);
+        foreach (Collider hit in hits)
         {
-            if (obj == null) continue;
+            GameObject obj = hit.gameObject;
 
-            Collider col = obj.GetComponent<Collider>();
-            if (col == null) continue;
-
-            Vector3 closestPoint = col.ClosestPoint(handPosition);
-            float distance = Vector3.Distance(closestPoint, handPosition);
-
-            if (distance <= grabDistanceThreshold)
+            // Check if this object is in the furniture list
+            if (furniturePieces.Contains(obj))
             {
-                return obj;
+                if (!grabbedObjects.Contains(obj))
+                {
+                    grabbedObjects.Add(obj);
+                    //Debug.Log($"✅ Grabbed {obj.name}");
+                }
             }
         }
 
-        return null;
+        return grabbedObjects;
+    }
+    void OnDrawGizmos()
+    {
+        foreach (var obj in furniturePieces)
+        {
+            if (obj == null) continue;
+
+            MeshCollider col = obj.GetComponent<MeshCollider>();
+            if (col != null)
+            {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawWireMesh(col.sharedMesh, obj.transform.position, obj.transform.rotation, obj.transform.lossyScale);
+            }
+        }
+
+        if (leftHandRigidbody != null)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawWireSphere(leftHandRigidbody.position, grabDistanceThreshold);
+        }
+        if (rightHandRigidbody != null)
+        {
+            Gizmos.color = Color.blue;
+            Gizmos.DrawWireSphere(rightHandRigidbody.position, grabDistanceThreshold);
+        }
     }
 }

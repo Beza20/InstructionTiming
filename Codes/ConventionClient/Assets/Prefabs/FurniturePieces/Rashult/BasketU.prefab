@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   StreamingClient: {fileID: 0}
-  RigidBodyId: 10
+  RigidBodyId: 9
   NetworkCompensation: 1
 --- !u!1001 &2518746132430545542
 PrefabInstance:

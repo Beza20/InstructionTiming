@@ -7,12 +7,23 @@ public class TriggerManager : MonoBehaviour
     [Header("Trigger GameObjects")]
     [SerializeField] private GameObject A1;     // A1 GameObject
     [SerializeField] private GameObject A2;     // A2 GameObject
-    [SerializeField] private GameObject B;      // B GameObject
+    [SerializeField] private GameObject B1;      // B1 GameObject
+    [SerializeField] private GameObject B2;      // B2 GameObject
+    [SerializeField] private GameObject P;      // p GameObject
+    [SerializeField] private GameObject Random;      // random GameObject
+
 
     [Header("Trigger States")]
     public bool isA1Active = false;  // State for A1 GameObject (Checkbox)
     public bool isA2Active = false;  // State for A2 GameObject (Checkbox)
-    public bool isBActive = false;   // State for B GameObject (Checkbox)
+    public bool isB1Active = false;   // State for B GameObject (Checkbox)
+    public bool isB2Active = false;   // State for B GameObject (Checkbox)
+    public bool isPActive = false;   // State for B GameObject (Checkbox)
+
+    public bool isRActive = false;   // State for B GameObject (Checkbox)
+    
+
+
 
     // Start is called before the first frame update
     void Start()
@@ -33,7 +44,10 @@ public class TriggerManager : MonoBehaviour
     {
         A1.SetActive(isA1Active);
         A2.SetActive(isA2Active);
-        B.SetActive(isBActive);
+        B1.SetActive(isB1Active);
+        B2.SetActive(isB2Active);
+        P.SetActive(isPActive);
+        Random.SetActive(isRActive);
     }
 
     // You can use this method to update bool values when toggles are changed
@@ -49,11 +63,30 @@ public class TriggerManager : MonoBehaviour
         UpdateGameObjectStates();
     }
 
-    public void OnBToggleChanged(bool value)
+    public void OnB1ToggleChanged(bool value)
     {
-        isBActive = value;
+        isB1Active = value;
         UpdateGameObjectStates();
     }
+
+    public void OnB2ToggleChanged(bool value)
+    {
+        isB2Active = value;
+        UpdateGameObjectStates();
+    }
+
+    public void OnPToggleChanged(bool value)
+    {
+        isPActive = value;
+        UpdateGameObjectStates();
+    }
+
+    public void OnRToggleChanged(bool value)
+    {
+        isRActive = value;
+        UpdateGameObjectStates();
+    }
+    
 
     
 
@@ -67,8 +100,17 @@ public class TriggerManager : MonoBehaviour
         if (isA2Active && A2 != null)
             activeTriggers.AddRange(A2.GetComponents<MonoBehaviour>());
 
-        if (isBActive && B != null)
-            activeTriggers.AddRange(B.GetComponents<MonoBehaviour>());
+        if (isB1Active && B1 != null)
+            activeTriggers.AddRange(B1.GetComponents<MonoBehaviour>());
+
+        if (isB2Active && B2 != null)
+            activeTriggers.AddRange(B2.GetComponents<MonoBehaviour>());
+
+        if (isPActive && P != null)
+            activeTriggers.AddRange(P.GetComponents<MonoBehaviour>());
+
+        if (isRActive && Random != null)
+            activeTriggers.AddRange(Random.GetComponents<MonoBehaviour>());
 
         return activeTriggers;
     }

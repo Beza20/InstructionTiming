@@ -246,7 +246,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         
                         // Play beep
                         Debug.Log("posdiff " + pos_diff + "pos diff seen " + k + " return at " + i);
-                        interviewManager?.TriggerInterview("A2");
+                        interviewManager?.TriggerInterview("A2-2");
                         _lastTriggerTimes[obj] = now;
                         break; 
 

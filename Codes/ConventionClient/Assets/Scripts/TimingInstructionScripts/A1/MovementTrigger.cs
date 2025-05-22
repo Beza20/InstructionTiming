@@ -9,8 +9,7 @@ public class MovementTrigger : MonoBehaviour
     [Header("Dependencies")]
     [SerializeField] private MovementTracker movementTracker;
     [SerializeField] private ObjectRotationTracker objectTracker;
-    [SerializeField] private AudioSource beepAudio;
-    [SerializeField] private TriggerInstructionPlayer instructionPlayer;
+   // [SerializeField] private AudioSource beepAudio;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
    
 

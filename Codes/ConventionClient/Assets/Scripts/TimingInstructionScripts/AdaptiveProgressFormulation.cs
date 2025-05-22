@@ -34,6 +34,12 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
     public List<FurnitureConfig> FurnitureConfigs;
     public Slider progressBar;
+    public Slider progressBar2;
+    public Slider progressBar3;
+    public Slider progressBar4;
+    public Slider progressBar5;
+
+    public Slider progressBar6;
     public TextMeshProUGUI progressText;
     public ObjectRotationTracker movementTracker;
 
@@ -52,6 +58,8 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     private HashSet<int> sequentialGroups = new HashSet<int> {1, 3 }; // Only group 3 subtasks must be  sequential
     private int lastActiveGroup = -1;
     private float lastKnownProgress = 0f;
+
+    private float idealProgress = 0.9f;
     private Dictionary<int, bool> groupSequentialRules = new Dictionary<int, bool>();
 
     private Transform a;
@@ -103,6 +111,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             
         }
     }
+    
 
     void Update()
     {
@@ -119,7 +128,12 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             }
         }
         float totalProgress = CalculateProgress();
-        progressBar.value = totalProgress;
+        progressBar.value = subtaskProgress[0];
+        progressBar2.value = subtaskProgress[1];
+        progressBar3.value = subtaskProgress[2];
+        progressBar4.value = subtaskProgress[3];
+        progressBar5.value = subtaskProgress[4];
+        progressBar6.value = subtaskProgress[5];
         progressText.text = $"Progress: {(totalProgress * 100f):F1}%";
     }
 
@@ -149,7 +163,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                 groupProgress = completedGroupsProgress + EvaluateGroupProgress(0);
                 lastKnownProgress = groupProgress;
                 lastActiveGroup = activeGroup;
-                Debug.Log("progress in group 0");
+                //Debug.Log("progress in group 0");
                 
                 return groupProgress;
 
@@ -185,6 +199,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         //Debug.Log("progress in calculate: " + groupProgress);
         return groupProgress;
     }
+    
 
     public float EvaluateGroupProgress(int groupID)
     {
@@ -195,16 +210,27 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         for (int i = 0; i < subtaskIndices.Count; i++)
         {
             int index = subtaskIndices[i];
-        
 
-            if (idealStateData.Subtasks[index].MustBeSequential && i > 0)
+            if (subtaskProgress[index] >= idealProgress)
             {
-                Debug.Log("checking if mustbe sequential works");
-                int prevIndex = subtaskIndices[i - 1];
-                if (subtaskProgress[prevIndex] < 1f)
-                    break; // stop if previous one in sequence is not complete
+                groupProgress += subtaskProgress[index];
+                continue;
             }
 
+
+
+            //if (idealStateData.Subtasks[index].MustBeSequential && i > 0)
+            if (i > 0)
+            {
+                //Debug.Log("checking if mustbe sequential works");
+                int prevIndex = subtaskIndices[i - 1];
+                if (subtaskProgress[prevIndex] < idealProgress)
+                {
+                    Debug.Log("subtask not complete because " + subtaskProgress[prevIndex] + " and ideal progress is " + idealProgress);
+                    break; // stop if previous one in sequence is not complete
+                }
+            }
+            
             groupProgress += EvaluateSubtask(index);
         }
         //Debug.Log("when group progress computes " + groupProgress);
@@ -228,12 +254,28 @@ public class AdaptiveProgressFormulation : MonoBehaviour
 
         if (aMoving && bMoving)
         {
+            Debug.Log("a and b moving");
+            idealProgress = 0.9f;
             return (true, candidateA.transform, candidateB.transform);
+        }
+        if (a1Moving && b1Moving)
+        {
+            idealProgress = 0.9f;
+            Debug.Log("a1 and b1 moving");
+            return (true, candidateA1.transform, candidateB1.transform);
         }
 
         if (aMoving && !bMoving && b1Moving)
         {
+            Debug.Log("a and b1 moving");
+            idealProgress = 0.48f;
             return (true, candidateA.transform, candidateB1.transform);
+        }
+        if (a1Moving && !b1Moving && bMoving)
+        {
+            Debug.Log("a1 and b moving");
+            idealProgress = 0.68f;
+            return (true, candidateA1.transform, candidateB.transform);
         }
         // Check nearby options to accommodate interchangeability
         float bestScore = float.MaxValue;
@@ -259,6 +301,30 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             aIndex = index - offset;
             bIndex = index;
         }
+        if (index == 2)
+        {
+            aIndex = index;
+            bIndex = index + offset;
+
+        }
+        if (index == 3)
+        {
+            aIndex = index - offset;
+            bIndex = index;
+        }
+        if (index == 4)
+        {
+            aIndex = index;
+            bIndex = index + offset;
+
+        }
+        if (index == 5)
+        {
+            aIndex = index - offset;
+            bIndex = index;
+        }
+        
+
         
 
         if (aIndex >= 0 && aIndex < activeFurnitureConfig.SubtaskPiecesA.Count &&
@@ -271,12 +337,12 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             float rotError = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(Quaternion.Inverse(aTry.rotation) * bTry.rotation, idealStateData.Subtasks[index].AngleDifference)));
 
             float totalScore = distError + rotError;
-            Debug.Log("best score " + bestScore);
-            Debug.Log("total score " + totalScore);
+            //Debug.Log("best score " + bestScore);
+            // Debug.Log("total score " + totalScore);
 
             if (totalScore < bestScore)
             {
-                Debug.Log("doing the alternative");
+                // Debug.Log("doing the alternative");
                 bestScore = totalScore;
                 bestA = aTry;
                 bestB = bTry;
@@ -291,7 +357,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     {
         var (found, aTransform, bTransform) = GetBestTransformPair(index);
         if (!found) return subtaskProgress[index]; // fallback to cached if nothing suitable
-        Debug.Log("found is true");
+        //Debug.Log("found is true");
 
         Vector3 r_ij = bTransform.position - aTransform.position;
         float distError = Mathf.Abs(r_ij.magnitude - idealStateData.Subtasks[index].RelativeDistance);
@@ -306,7 +372,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         progress = Mathf.Clamp01(progress);
 
         subtaskProgress[index] = progress;
-        Debug.Log("checking subtaskProgress " + subtaskProgress[index]);
+        Debug.Log("checking subtaskProgress of " + index + " " + subtaskProgress[index]);
         return progress;
     }
 
@@ -316,13 +382,15 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
-            if (subtaskProgress[i] < 0.7f){
-                
+            //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);
+            if (subtaskProgress[i] < idealProgress)
+            {
+                //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);
                 return false;
             }
            
         }
-        Debug.Log("group is complete: " + groupID);
+        Debug.Log("group is complete: " + groupID  );
         return true;
     }
     public bool IsSubtaskComplete(int groupID)
@@ -331,13 +399,13 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         foreach (int i in subtaskIndices)
         {
             Debug.Log("subtaskprogress is " + subtaskProgress[i]);
-            if (subtaskProgress[i] > 0.7f){
+            if (subtaskProgress[i] > idealProgress){
                 
                 return true;
             }
            
         }
-        Debug.Log("group is complete: " + groupID);
+        Debug.Log("group is not complete: " + groupID);
         return false;
 
     }
@@ -365,6 +433,19 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                     {
                         Debug.Log(pieceB.ToString() + "is moving");
                     }
+                    if (subtaskIndex == 4 || subtaskIndex == 5)
+                    {
+                        if (IsMoving(pieceA) && IsGroupComplete(0))
+                        {
+                            return groupID - 1;
+                        }
+                        else
+                        {
+                            return groupID;
+                        }
+
+                        
+                    }
 
                     if (subtaskIndex == 2 || subtaskIndex == 3)
                     {
@@ -374,7 +455,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                         }
                         else
                         {
-                            Debug.Log("group is not complete");
+                            //Debug.Log("group is not complete");
                             return groupID + 1;
                         }
 
@@ -395,5 +476,23 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     public void MarkSubtaskComplete(int index)
     {
         subtaskProgress[index] = 1f;
+    }
+    public List<GameObject> GetSubtaskPiecesA()
+    {
+        return activeFurnitureConfig.SubtaskPiecesA;
+    }
+
+    public List<GameObject> GetSubtaskPiecesB()
+    {
+        return activeFurnitureConfig.SubtaskPiecesB;
+    }
+
+    public Dictionary<int, List<int>> GetGroupedSubtasks()
+    {
+        return groupedSubtasks;
+    }
+    public float GetTotalProgress()
+    {
+        return progressBar.value;
     }
 }
