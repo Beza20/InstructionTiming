@@ -19,9 +19,15 @@ public class TriggerManagerCoordinator : MonoBehaviour
     public TMP_InputField openEndedInput;
     public Button submitButton;
 
+    [SerializeField] private Transform head1;
+    [SerializeField] private Transform head2;
+    [SerializeField] private bool useHead2 = false;
+
     private string responseQ1 = "";
     private string openEndedResponse = "";
     private string currentTriggerSource = "";
+
+    public Transform ActiveHead => useHead2 ? head2 : head1;
 
     [SerializeField] private TriggerManager triggerManager;
     //[SerializeField] private TriggerInstructionPlayer instructionPlayer;
@@ -116,19 +122,27 @@ public class TriggerManagerCoordinator : MonoBehaviour
     private void ResumeTriggers()
     {
         foreach (var script in triggerScripts)
+        {
             script.enabled = true;
+            // Check if the script has a ResetTrigger method before calling it
+            var method = script.GetType().GetMethod("ResetTrigger");
+            if (method != null)
+            {
+                method.Invoke(script, null);
+            }
+        }
     }
     private void LogInitialNo()
     {
         openEndedResponse = ""; // clear just in case
-        string log = $"{GetUnixTimestamp()}, {currentTriggerSource}, No, ";
+        string log = $"{Time.realtimeSinceStartupAsDouble}, {currentTriggerSource}, No, ";
         Debug.Log(log);
         File.AppendAllText(sessionLogFilePath, log); // Don't add \n yet
     }
 
     private void LogResponses()
     {
-        string log = $"{GetUnixTimestamp()}, {currentTriggerSource}, {responseQ1}, {openEndedResponse}";
+        string log = $"{Time.realtimeSinceStartupAsDouble}, {currentTriggerSource}, {responseQ1}, {openEndedResponse}";
         Debug.Log(log);
         File.AppendAllText(sessionLogFilePath, log + "\n");
     }

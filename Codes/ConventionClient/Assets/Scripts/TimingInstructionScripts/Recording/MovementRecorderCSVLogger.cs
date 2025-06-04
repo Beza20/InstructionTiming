@@ -62,7 +62,7 @@ public class MovementRecorderCSVLogger : MonoBehaviour
 
         filePath = Path.Combine(folderPath, fileName);
         csvWriter = new StreamWriter(filePath, false);
-        csvWriter.WriteLine("TimeSinceStart,ObjectName,PosX,PosY,PosZ,RotX,RotY,RotZ,RotW");
+        csvWriter.WriteLine("Time,ObjectName,PosX,PosY,PosZ,RotX,RotY,RotZ,RotW");
 
         Debug.Log($"📁 Auto-logging started. Saving to: {filePath}");
     }
@@ -76,7 +76,7 @@ public class MovementRecorderCSVLogger : MonoBehaviour
     {
         if (csvWriter == null) return;
 
-        float timestamp = Time.time;
+        double timestamp = Time.realtimeSinceStartup;
 
         foreach (var obj in objectsToTrack)
         {
@@ -86,6 +86,7 @@ public class MovementRecorderCSVLogger : MonoBehaviour
             Quaternion rot = obj.transform.rotation;
 
             string line = $"{timestamp:F3},{obj.name},{pos.x:F5},{pos.y:F5},{pos.z:F5},{rot.x:F5},{rot.y:F5},{rot.z:F5},{rot.w:F5}";
+
             csvWriter.WriteLine(line);
         }
 

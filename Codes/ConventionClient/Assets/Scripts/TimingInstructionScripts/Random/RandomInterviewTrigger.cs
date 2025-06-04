@@ -38,4 +38,10 @@ public class RandomInterviewTrigger : MonoBehaviour
             }
         }
     }
+
+    public void ResetTrigger()
+    {
+        Debug.Log("Random reset doing nothing");
+    }
+
 }

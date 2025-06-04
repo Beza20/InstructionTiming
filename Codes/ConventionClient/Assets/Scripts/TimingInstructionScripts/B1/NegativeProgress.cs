@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.UI;
 using TMPro;
-using System.Linq; 
+using System.Linq;
 public class NegativeProgress : MonoBehaviour
 {
     [Header("References")]
@@ -11,7 +11,7 @@ public class NegativeProgress : MonoBehaviour
 
     [Header("Monitoring Settings")]
     [SerializeField] private float checkInterval = 0.05f; // in seconds
-    [SerializeField] private float durationThreshold = 5f; // how long without improvement before triggering
+    [SerializeField] private float durationThreshold = 0.1f; // how long without improvement before triggering
 
     [Header("Optional Feedback")]
     [SerializeField] private AudioSource warningBeep;
@@ -19,7 +19,7 @@ public class NegativeProgress : MonoBehaviour
     [SerializeField] private TriggerManagerCoordinator interviewManager;
     [SerializeField] private string triggerLabel = "negative_progress";
     private Queue<float> progressHistory = new Queue<float>();
-    [SerializeField] private int historyWindowSize = 5; // Number of samples (e.g., last 5 seconds)
+    [SerializeField] private int historyWindowSize = 300; // Number of samples (e.g., last 5 seconds)
     private float smoothedProgress = 0f;
     [SerializeField] private float alpha = 0.1f;
     public Slider progressBar7;
@@ -29,6 +29,8 @@ public class NegativeProgress : MonoBehaviour
     private float lastCheckedProgress = 0f;
     private float timeSinceImprovement = 0f;
     private float checkTimer = 0f;
+    private float cooldown_neg = 8;
+    private float last_trigger = 0;
 
     public event Action OnNegativeProgressTriggered; // Optional hook for other scripts
 
@@ -37,6 +39,8 @@ public class NegativeProgress : MonoBehaviour
         if (progressScript == null) return;
 
         checkTimer += Time.deltaTime;
+        last_trigger += Time.deltaTime;
+
 
         if (checkTimer >= checkInterval)
         {
@@ -44,8 +48,10 @@ public class NegativeProgress : MonoBehaviour
 
             int activeGroup = progressScript.GetActiveGroup();
             if (activeGroup == -1) return;
+            Debug.Log("passing");
 
             float currentProgress = progressScript.EvaluateGroupProgress(activeGroup);
+            // Debug.Log("cureent progresss " + currentProgress);
             filteredProgress = alpha * currentProgress + (1 - alpha) * filteredProgress;
 
             // Add to history
@@ -62,10 +68,17 @@ public class NegativeProgress : MonoBehaviour
             progressBar7.value = averageProgress;
             progressBar8.value = filteredProgress;
 
+            // Debug.Log("VERAGE progresss " + averageProgress);
+            // Debug.Log("filter progresss " + filteredProgress);
+
+
+
             // Compare smoothed progress to previous smoothed progress
-            if (averageProgress >= filteredProgress + 0.1f)
+            if (averageProgress >= (filteredProgress + 0.05f) && (last_trigger > cooldown_neg))
             {
-                Debug.Log("negative detected");
+                Debug.Log("negative detected" + last_trigger);
+                last_trigger = 0;
+                TriggerNegativeProgressEvent();
                 timeSinceImprovement += checkInterval;
             }
             else
@@ -73,7 +86,7 @@ public class NegativeProgress : MonoBehaviour
                 timeSinceImprovement = 0f;
             }
 
-           
+
             if (timeSinceImprovement >= durationThreshold)
             {
                 TriggerNegativeProgressEvent();
@@ -93,6 +106,16 @@ public class NegativeProgress : MonoBehaviour
             interviewManager.TriggerInterview(triggerLabel);
         else
             Debug.Log("InterviewManager is not assigned!");
+    }
+    
+    public void ResetTrigger()
+    {
+        Debug.Log("Resetting B1");
+        last_trigger = 0;
+       
+        
+       
+       
     }
 
                

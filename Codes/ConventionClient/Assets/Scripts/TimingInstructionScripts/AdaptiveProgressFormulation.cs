@@ -3,18 +3,22 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Linq;
+using System;
 
 public class AdaptiveProgressFormulation : MonoBehaviour
 {
     [System.Serializable]
     public class SubtaskData
     {
-        public string SubtaskName;
+        public string SubtaskLabel;        // e.g., "Subtask1A"
         public float RelativeDistance;
         public Quaternion AngleDifference;
 
-        public int GroupID; // 0: interchangeable 1-4, 1: interchangeable 5-6, 2: sequential 7-9
-        public bool MustBeSequential;
+        public int GroupID;                // e.g., 0 = interchangeable 1–4, 1 = 5–6, 2 = sequential 7–9
+        public bool MustBeSequential;      // Used only if sequential order matters
+
+
+        [NonSerialized] public string BaseLabel;   // e.g., "Subtask1" (computed at load time)
     }
 
     [System.Serializable]
@@ -22,14 +26,20 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     {
         public List<SubtaskData> Subtasks = new List<SubtaskData>();
     }
+    [System.Serializable]
+    public class SubtaskDefinition
+    {
+        public string BaseLabel;           // e.g., "Subtask1"
+        public GameObject PieceA;
+        public GameObject PieceB;
+    }
 
     [System.Serializable]
     public class FurnitureConfig
     {
         public string FurnitureName;
         public TextAsset IdealStateFile;
-        public List<GameObject> SubtaskPiecesA;
-        public List<GameObject> SubtaskPiecesB;
+        public List<SubtaskDefinition> CurrentSubtasks; // Runtime state of objects
     }
 
     public List<FurnitureConfig> FurnitureConfigs;
@@ -69,6 +79,10 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     private bool started = false;
     private float groupProgress = 0;
     private Dictionary<int, float> completedGroups = new Dictionary<int, float>();
+    private Dictionary<int, int> variantDependencies = new Dictionary<int, int>();
+    private Dictionary<int, List<List<int>>> variantChains = new Dictionary<int, List<List<int>>>();
+    private Dictionary<int, float> groupProgressDict = new Dictionary<int, float>();
+
 
 
 
@@ -85,32 +99,114 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         groupedSubtasks.Clear();
         subtaskProgress.Clear();
         groupSequentialRules.Clear();
+        variantDependencies.Clear(); // Make sure to declare this as a Dictionary<int, int> elsewhere
 
         // Define group sequentiality: true = sequential, false = parallel
-        groupSequentialRules[0] = false;
-        groupSequentialRules[1] = true; // this group must be done only if 0 is completed
-        groupSequentialRules[2] = false; // this group can be done first
-        groupSequentialRules[3] = true; // This group is gated by completion of groups 0–2
+        groupSequentialRules[0] = false; // Group 0: 1A/B, 2A/B, 3*
+        groupSequentialRules[1] = false;  // Group 1: 3A/B, 4A/B
+        groupSequentialRules[2] = false; // Group 2: 5A/B, 6A/B
+        groupSequentialRules[3] = true;  // Group 3: 7, 8*, 9, 10
 
         for (int i = 0; i < idealStateData.Subtasks.Count; i++)
         {
             var subtask = idealStateData.Subtasks[i];
 
-            // Hardcoded group assignment logic
-            if (i < 2) { subtask.GroupID = 0; subtask.MustBeSequential = false; }
-            else if (i < 4) { subtask.GroupID = 1; subtask.MustBeSequential = false; }
-            else if (i < 6) { subtask.GroupID = 2; subtask.MustBeSequential = false; }
-            else { subtask.GroupID = 3; subtask.MustBeSequential = true; }
+            // Assign GroupID and sequentiality based on index
+            if (i >= 0 && i <= 4) // Subtasks 1A, 1B, 2A, 2B, 3*
+            {
+                subtask.GroupID = 0;
+                subtask.MustBeSequential = false;
+            }
+            else if (i >= 5 && i <= 8) // Subtasks 3A, 3B, 4A, 4B
+            {
+                subtask.GroupID = 1;
+                subtask.MustBeSequential = true;
+            }
+            else if (i >= 9 && i <= 12) // Subtasks 5A, 6A, 5B, 6B
+            {
+                subtask.GroupID = 2;
+                subtask.MustBeSequential = false;
+            }
+            else if (i >= 13 && i <= 16) // Subtasks 7, 8*, 9, 10
+            {
+                subtask.GroupID = 3;
+                subtask.MustBeSequential = true;
+            }
 
             if (!groupedSubtasks.ContainsKey(subtask.GroupID))
                 groupedSubtasks[subtask.GroupID] = new List<int>();
 
             groupedSubtasks[subtask.GroupID].Add(i);
             subtaskProgress[i] = 0f;
-
-            
         }
+
+        // Define variant dependencies
+        // Group 0 logic (1A/B → 2A/B and vice versa)
+        variantDependencies[0] = 1; // 1B → 2B
+        variantDependencies[1] = 0; // 2B → 1B
+        variantDependencies[3] = 4; // 1A → 2A
+        variantDependencies[4] = 3; // 2A → 1A
+
+        // Group 2 logic (5A/B → 6A/B and vice versa)
+        variantDependencies[9] = 10;  // 5A → 6A
+        variantDependencies[10] = 9;  // 6A → 5A
+        variantDependencies[11] = 12; // 5B → 6B
+        variantDependencies[12] = 11; // 6B → 5B
+
+        variantChains.Clear();
+
+        // Add chains for Group 0 (1A+2A+3*, etc.)
+        variantChains[0] = new List<List<int>>
+        {
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask1A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask2A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3*")
+            },
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask2A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask1A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3*")
+            },
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask1B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask2B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3*")
+            },
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask2B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask1B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3*")
+            }
+        };
+
+        // Add chains for Group 1 (3A+4A, 3B+4B)
+        variantChains[1] = new List<List<int>>
+        {
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask4A")
+            },
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask3B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask4B")
+            }
+        };
+
+        // Add chains for Group 2 (5A+6A, 5B+6B)
+        variantChains[2] = new List<List<int>>
+        {
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask5A"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask6A")
+            },
+            new List<int> {
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask5B"),
+                idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask6B")
+            }
+        };
     }
+
     
 
     void Update()
@@ -128,20 +224,21 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             }
         }
         float totalProgress = CalculateProgress();
-        progressBar.value = subtaskProgress[0];
-        progressBar2.value = subtaskProgress[1];
-        progressBar3.value = subtaskProgress[2];
-        progressBar4.value = subtaskProgress[3];
-        progressBar5.value = subtaskProgress[4];
-        progressBar6.value = subtaskProgress[5];
+        progressBar.value = totalProgress;
+        // progressBar2.value = subtaskProgress[1];
+        // progressBar3.value = subtaskProgress[2];
+        // progressBar4.value = subtaskProgress[3];
+        // progressBar5.value = subtaskProgress[4];
+        // progressBar6.value = subtaskProgress[5];
         progressText.text = $"Progress: {(totalProgress * 100f):F1}%";
     }
 
-    float CalculateProgress()
+   float CalculateProgress()
     {
         int activeGroup = GetActiveGroup();
         Debug.Log($"Active group: {activeGroup}");
-        // First, check if any groups are now complete (regardless of active group)
+
+        // Step 1: Update completed group cache
         for (int groupID = 0; groupID < groupedSubtasks.Count; groupID++)
         {
             if (IsGroupComplete(groupID) && !completedGroups.ContainsKey(groupID))
@@ -150,36 +247,32 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                 completedGroups[groupID] = groupScore;
                 Debug.Log($"Group {groupID} completed with progress {groupScore:F2}!");
             }
-
         }
-        // Sum progress of all completed groups (0 if none)
-        float completedGroupsProgress = completedGroups.Values.Sum() / groupedSubtasks.Count;
-        
-        if (activeGroup == -1) 
-        {
-            if (lastKnownProgress == 0)
-            {
-                
-                groupProgress = completedGroupsProgress + EvaluateGroupProgress(0);
-                lastKnownProgress = groupProgress;
-                lastActiveGroup = activeGroup;
-                //Debug.Log("progress in group 0");
-                
-                return groupProgress;
 
-            }   
-            
-            else
+        float completedGroupsProgress = completedGroups.Values.Sum() / groupedSubtasks.Count;
+
+        // Step 2: If no active group, return known or group 0
+        if (activeGroup == -1)
+        {
+            if (lastKnownProgress == 0f)
             {
+                float group0Score = EvaluateGroupProgress(0);
+                if (IsGroupComplete(0))
+                {
+                    lastKnownProgress = completedGroupsProgress;
+                }
+                else
+                {
+                    lastKnownProgress = completedGroupsProgress + group0Score;
+                    lastActiveGroup = 0;
+                }
+                
                 return lastKnownProgress;
             }
-        } 
-        if (activeGroup == 1 && !IsGroupComplete(0))
-        {
             return lastKnownProgress;
         }
-       
-        // Enforce sequential dependency
+
+        // Step 3: Block if active group depends on incomplete earlier groups
         if (sequentialGroups.Contains(activeGroup))
         {
             for (int g = 0; g < activeGroup; g++)
@@ -188,183 +281,198 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                     return lastKnownProgress;
             }
         }
-        if (!completedGroups.ContainsKey(activeGroup)){
-            groupProgress = EvaluateGroupProgress(activeGroup);
-            lastKnownProgress = groupProgress;
-            lastActiveGroup = activeGroup;
+        
+        // Step 4: Evaluate active group if not cached
+        float currentGroupProgress = completedGroups.ContainsKey(activeGroup)
+            ? completedGroups[activeGroup]
+            : EvaluateGroupProgress(activeGroup);
 
+        // Step 5: Final aggregation
+        float totalProgress = completedGroupsProgress;
+        if (!completedGroups.ContainsKey(activeGroup))
+        {
+            totalProgress += currentGroupProgress;
         }
 
-        groupProgress += completedGroupsProgress;
-        //Debug.Log("progress in calculate: " + groupProgress);
-        return groupProgress;
+        lastKnownProgress = totalProgress;
+        lastActiveGroup = activeGroup;
+        return totalProgress;
     }
+
     
 
     public float EvaluateGroupProgress(int groupID)
     {
+        
         float groupProgress = 0f;
         var subtaskIndices = groupedSubtasks[groupID];
-        bool mustBeSequential = groupSequentialRules.ContainsKey(groupID) && groupSequentialRules[groupID];
 
-        for (int i = 0; i < subtaskIndices.Count; i++)
+        /// GROUP 0: (1A+2A+3*) or (1B+2B+3*) or (2A+1A+3*) or (2B+1B+3*)
+        if (groupID == 0)
         {
-            int index = subtaskIndices[i];
-
-            if (subtaskProgress[index] >= idealProgress)
+            float bestChainScore = 0f;
+    
+            // Iterate through all chains defined for group 0
+            foreach (var chain in variantChains[0])
             {
-                groupProgress += subtaskProgress[index];
-                continue;
-            }
+                float chainScore = 0f;
 
-
-
-            //if (idealStateData.Subtasks[index].MustBeSequential && i > 0)
-            if (i > 0)
-            {
-                //Debug.Log("checking if mustbe sequential works");
-                int prevIndex = subtaskIndices[i - 1];
-                if (subtaskProgress[prevIndex] < idealProgress)
+                foreach (int subtaskIndex in chain)
                 {
-                    Debug.Log("subtask not complete because " + subtaskProgress[prevIndex] + " and ideal progress is " + idealProgress);
-                    break; // stop if previous one in sequence is not complete
+                    float score = EvaluateSubtask(subtaskIndex);
+                    chainScore += score;
+                    //Debug.Log("evaluated subtask " + score);
                 }
+
+                chainScore /= chain.Count;
+                bestChainScore = Mathf.Max(bestChainScore, chainScore);
             }
-            
-            groupProgress += EvaluateSubtask(index);
+            //Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
+            return bestChainScore;
+
         }
-        //Debug.Log("when group progress computes " + groupProgress);
+
+        if (groupID == 1 && !IsGroupComplete(0))
+        {
+            Debug.Log("Skipping evaluation of Group 1 because Group 0 is not complete.");
+            return 0f;
+        }
+
+        if (groupID == 1)
+        {
+            float bestChainScore = 0f;
+    
+            /// Iterate through all chains defined for group 0
+            foreach (var chain in variantChains[1])
+            {
+                float chainScore = 0f;
+
+                foreach (int subtaskIndex in chain)
+                {
+                    float score = EvaluateSubtask(subtaskIndex);
+                    chainScore += score;
+                    //Debug.Log("evaluated subtask " + score);
+                }
+
+                chainScore /= chain.Count;
+                bestChainScore = Mathf.Max(bestChainScore, chainScore);
+            }
+            //Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
+            return bestChainScore;
+        }
+
+        // GROUP 2: (5A+6A) or (5B+6B) — direction doesn't matter
+        if (groupID == 2)
+        {
+            float bestChainScore = 0f;
+    
+            
+            // Iterate through all chains defined for group 2
+            foreach (var chain in variantChains[2])
+            {
+                float chainScore = 0f;
+
+                foreach (int subtaskIndex in chain)
+                {
+                    float score = EvaluateSubtask(subtaskIndex);
+                    chainScore += score;
+                    //Debug.Log("evaluated subtask " + score);
+                }
+
+                chainScore /= chain.Count;
+                bestChainScore = Mathf.Max(bestChainScore, chainScore);
+            }
+            //Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
+            return bestChainScore;
+            
+            return bestChainScore;
+        }
+        if (groupID == 3 && (!IsGroupComplete(0) || !IsGroupComplete(1) || !IsGroupComplete(2)))
+        {
+            Debug.Log("Skipping evaluation of Group 3 because Groups 0-2 are not complete.");
+            return 0f;
+        }
+
+        // GROUP 3: Standard evaluation (sequential optional)
+        if (groupID == 3)
+        {
+            Debug.Log($"variantChains count: {variantChains.Count}");
+
+            float groupScore = 0f;
+            int count = 0;
+
+            int idx8 = idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask8*");
+            int idx9 = idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask9");
+
+            bool skip8 = idx8 != -1 && idx9 != -1 &&
+                        subtaskProgress.ContainsKey(idx9) &&
+                        subtaskProgress[idx9] >= idealProgress;
+
+            for (int i = 0; i < subtaskIndices.Count; i++)
+            {
+                int index = subtaskIndices[i];
+                if (index == idx8 && skip8)
+                {
+                    Debug.Log("Skipping Subtask8* due to Subtask9 completion.");
+                    continue;
+                }
+
+                // Sequential gate
+                if (i > 0)
+                {
+                    int prevIndex = subtaskIndices[i - 1];
+                    if (subtaskProgress[prevIndex] < idealProgress)
+                        break;
+                }
+
+                groupScore += EvaluateSubtask(index);
+                count++;
+            }
+
+            return count > 0 ? groupScore / count : 0f;
+        }
 
         return groupProgress / subtaskIndices.Count;
     }
 
-    (bool found, Transform a, Transform b) GetBestTransformPair(int index)
-    {
-        GameObject candidateA = activeFurnitureConfig.SubtaskPiecesA[index];
-        GameObject candidateB = activeFurnitureConfig.SubtaskPiecesB[index];
-        GameObject candidateA1 = activeFurnitureConfig.SubtaskPiecesA[index + 1];
-        GameObject candidateB1 = activeFurnitureConfig.SubtaskPiecesB[index + 1];
 
-
-        bool aMoving = IsMoving(candidateA);
-        bool bMoving = IsMoving(candidateB);
-        bool a1Moving = IsMoving(candidateA1);
-        bool b1Moving = IsMoving(candidateB1);
-
-
-        if (aMoving && bMoving)
-        {
-            Debug.Log("a and b moving");
-            idealProgress = 0.9f;
-            return (true, candidateA.transform, candidateB.transform);
-        }
-        if (a1Moving && b1Moving)
-        {
-            idealProgress = 0.9f;
-            Debug.Log("a1 and b1 moving");
-            return (true, candidateA1.transform, candidateB1.transform);
-        }
-
-        if (aMoving && !bMoving && b1Moving)
-        {
-            Debug.Log("a and b1 moving");
-            idealProgress = 0.48f;
-            return (true, candidateA.transform, candidateB1.transform);
-        }
-        if (a1Moving && !b1Moving && bMoving)
-        {
-            Debug.Log("a1 and b moving");
-            idealProgress = 0.68f;
-            return (true, candidateA1.transform, candidateB.transform);
-        }
-        // Check nearby options to accommodate interchangeability
-        float bestScore = float.MaxValue;
-        Transform bestA = candidateA.transform;
-        Transform bestB = candidateB.transform;
-        float distErrorBest = Mathf.Abs((bestB.position - bestA.position).magnitude - idealStateData.Subtasks[index].RelativeDistance);
-        float rotErrorBest = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(Quaternion.Inverse(bestA.rotation) * bestB.rotation, idealStateData.Subtasks[index].AngleDifference)));
-
-        bestScore = distErrorBest + rotErrorBest;
-        bool found = false;
-        int aIndex = index;
-        int bIndex = index;
-
-        int offset = 1; // allow checking adjacent indices
-        if (index == 0)
-        {
-            aIndex = index;
-            bIndex = index + offset;
-
-        }
-        if (index == 1)
-        {
-            aIndex = index - offset;
-            bIndex = index;
-        }
-        if (index == 2)
-        {
-            aIndex = index;
-            bIndex = index + offset;
-
-        }
-        if (index == 3)
-        {
-            aIndex = index - offset;
-            bIndex = index;
-        }
-        if (index == 4)
-        {
-            aIndex = index;
-            bIndex = index + offset;
-
-        }
-        if (index == 5)
-        {
-            aIndex = index - offset;
-            bIndex = index;
-        }
-        
-
-        
-
-        if (aIndex >= 0 && aIndex < activeFurnitureConfig.SubtaskPiecesA.Count &&
-            bIndex >= 0 && bIndex < activeFurnitureConfig.SubtaskPiecesB.Count)
-        {
-            Transform aTry = activeFurnitureConfig.SubtaskPiecesA[aIndex].transform;
-            Transform bTry = activeFurnitureConfig.SubtaskPiecesB[bIndex].transform;
-
-            float distError = Mathf.Abs((bTry.position - aTry.position).magnitude - idealStateData.Subtasks[index].RelativeDistance);
-            float rotError = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(Quaternion.Inverse(aTry.rotation) * bTry.rotation, idealStateData.Subtasks[index].AngleDifference)));
-
-            float totalScore = distError + rotError;
-            //Debug.Log("best score " + bestScore);
-            // Debug.Log("total score " + totalScore);
-
-            if (totalScore < bestScore)
-            {
-                // Debug.Log("doing the alternative");
-                bestScore = totalScore;
-                bestA = aTry;
-                bestB = bTry;
-                found = true;
-            }
-        }
-        found = true;
-        return (found, bestA, bestB);
-    }
+    
 
     float EvaluateSubtask(int index)
     {
-        var (found, aTransform, bTransform) = GetBestTransformPair(index);
-        if (!found) return subtaskProgress[index]; // fallback to cached if nothing suitable
-        //Debug.Log("found is true");
+        var subtask = idealStateData.Subtasks[index];
+       // Debug.Log($"Entering EvaluateSubtask for {index} – {idealStateData.Subtasks[index].SubtaskLabel}");
+
+        // Find corresponding runtime GameObjects by BaseLabel
+        var definition = activeFurnitureConfig.CurrentSubtasks
+            .FirstOrDefault(def => def.BaseLabel == subtask.SubtaskLabel);
+
+        if (definition == null || definition.PieceA == null || definition.PieceB == null)
+        {
+            Debug.LogWarning($"Missing GameObjects for subtask {subtask.SubtaskLabel}");
+            return subtaskProgress.ContainsKey(index) ? subtaskProgress[index] : 0f;
+        }
+
+        
+        if (idealStateData.Subtasks[index].SubtaskLabel == "Subtask8*")
+        {
+            int idx9 = idealStateData.Subtasks.FindIndex(s => s.SubtaskLabel == "Subtask9");
+            if (idx9 != -1 && subtaskProgress.ContainsKey(idx9) && subtaskProgress[idx9] >= idealProgress)
+            {
+                // Just return the stored (frozen) value — do not re-evaluate
+                return subtaskProgress.ContainsKey(index) ? subtaskProgress[index] : 0f;
+            }
+        }
+
+        Transform aTransform = definition.PieceA.transform;
+        Transform bTransform = definition.PieceB.transform;
 
         Vector3 r_ij = bTransform.position - aTransform.position;
-        float distError = Mathf.Abs(r_ij.magnitude - idealStateData.Subtasks[index].RelativeDistance);
+        float distError = Mathf.Abs(r_ij.magnitude - subtask.RelativeDistance);
         float posPenalty = Mathf.Max(0f, distError - epsilonP) / (deltaPMax - epsilonP);
 
         Quaternion q_ij = Quaternion.Inverse(aTransform.rotation) * bTransform.rotation;
-        Quaternion q_goal = idealStateData.Subtasks[index].AngleDifference;
+        Quaternion q_goal = subtask.AngleDifference;
         float rotError = Mathf.Abs(1f - Mathf.Abs(Quaternion.Dot(q_ij, q_goal)));
         float rotPenalty = Mathf.Max(0f, rotError - epsilonQ) / (1f - epsilonQ);
 
@@ -372,25 +480,50 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         progress = Mathf.Clamp01(progress);
 
         subtaskProgress[index] = progress;
-        Debug.Log("checking subtaskProgress of " + index + " " + subtaskProgress[index]);
+        //Debug.Log($"Target distance: {subtask.RelativeDistance}, Actual: {r_ij.magnitude}, PosError: {posPenalty}");
+       // Debug.Log($"Angle goal: {subtask.AngleDifference}, Actual: {q_ij}, RotError: {rotPenalty}");
+
+       // Debug.Log($"Progress for subtask {index} ({subtask.SubtaskLabel}) = {progress:F2}");
+
         return progress;
     }
 
-
-    bool IsGroupComplete(int groupID)
+    public bool IsGroupComplete(int groupID)
     {
+        int win_counter = 0;
+        int subtask_pos = 0;
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
             //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);
             if (subtaskProgress[i] < idealProgress)
             {
-                //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);
-                return false;
+                if (groupID == 0 && win_counter < 3 && subtask_pos == groupedSubtasks[groupID].Count - 1)
+                {
+                    return false;
+
+                }
+
+                if ((groupID == 1 || groupID == 2) && win_counter < 2 && subtask_pos == groupedSubtasks[groupID].Count - 1)
+                {
+                    return false;
+
+                }
+                if ((groupID == 3))
+                {
+                    return false;
+                }
+                //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);    
             }
+            if (subtaskProgress[i] > idealProgress)
+            {
+                win_counter++;
+            }
+            subtask_pos++;
+           
            
         }
-        Debug.Log("group is complete: " + groupID  );
+        Debug.Log("group " + groupID + " is complete"  );
         return true;
     }
     public bool IsSubtaskComplete(int groupID)
@@ -411,64 +544,94 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     }
     
 
-   public int GetActiveGroup()
+    public int GetActiveGroup()
     {
+        //Debug.Log($"Checking groups: {string.Join(", ", groupedSubtasks.Keys)}");
         foreach (var kvp in groupedSubtasks)
         {
             int groupID = kvp.Key;
+
             foreach (int subtaskIndex in kvp.Value)
             {
+                string label = idealStateData.Subtasks[subtaskIndex].SubtaskLabel;
 
-                var pieceA = activeFurnitureConfig.SubtaskPiecesA[subtaskIndex];
-                var pieceB = activeFurnitureConfig.SubtaskPiecesB[subtaskIndex];
+                var definition = activeFurnitureConfig.CurrentSubtasks
+                    .FirstOrDefault(def => def.BaseLabel == label);  // Match exact label
+                if (definition == null)
+                    Debug.LogWarning($"No subtask definition found for base label: {label}");
 
+                if (definition == null || definition.PieceA == null || definition.PieceB == null)
+                    continue;
 
-                if (IsMoving(pieceA) || IsMoving(pieceB))
+                bool aMoving = IsMoving(definition.PieceA);
+                bool bMoving = IsMoving(definition.PieceB);
+
+                if (aMoving || bMoving)
                 {
-                    if(IsMoving(pieceA) )
+                    if (aMoving) Debug.Log($"{definition.PieceA.name} is moving");
+                    if (bMoving) Debug.Log($"{definition.PieceB.name} is moving");
+                    if (groupID == 0  && IsGroupComplete(0) )
                     {
-                        Debug.Log(pieceA.ToString() + "is moving");
-                    }
-                    if(IsMoving(pieceB) )
-                    {
-                        Debug.Log(pieceB.ToString() + "is moving");
-                    }
-                    if (subtaskIndex == 4 || subtaskIndex == 5)
-                    {
-                        if (IsMoving(pieceA) && IsGroupComplete(0))
-                        {
-                            return groupID - 1;
-                        }
-                        else
-                        {
-                            return groupID;
-                        }
+                        continue;
 
-                        
+                    }
+                    if (groupID == 1  && IsGroupComplete(1) )
+                    {
+                        continue;
+
+                    }
+                    if (groupID == 2  && IsGroupComplete(2) )
+                    {
+                        continue;
+
                     }
 
-                    if (subtaskIndex == 2 || subtaskIndex == 3)
+                    // Gate Group 1 on Group 0 completion
+                    if (groupID == 1 && !IsGroupComplete(0))
                     {
-                        if (IsMoving(pieceA) && IsGroupComplete(0))
-                        {
-                            return groupID;
-                        }
-                        else
-                        {
-                            //Debug.Log("group is not complete");
-                            return groupID + 1;
-                        }
+                        Debug.Log("Group 1 blocked: Group 0 not complete.");
+                        return 2;
+                    }
 
-                    } 
-                    
+                    if (groupID == 3 && !IsGroupComplete(0))
+                    {
+                        Debug.Log("Group 3 blocked: Group 0 not complete.");
+                        return 0;
+                    }
+                    if (groupID == 3 && !IsGroupComplete(1))
+                    {
+                        Debug.Log("Group 3 blocked: Group 1 not complete.");
+                        return 1;
+                    }
+
+                    if (groupID == 3 && !IsGroupComplete(2))
+                    {
+                        Debug.Log("Group 3 blocked: Group 2 not complete.");
+                        return 2;
+                    }
+
+                    // Gate Group 3 on Groups 0–2 completion
+                    if (groupID == 3)
+                    {
+                        for (int i = 0; i <= 2; i++)
+                        {
+                            if (!IsGroupComplete(i))
+                            {
+                                Debug.Log($"Group 3 blocked: Group {i} not complete.");
+                                return -1;
+                            }
+                        }
+                    }
+
                     return groupID;
                 }
             }
         }
-        return -1;
+
+        return -1; // No active group found
     }
 
-    bool IsMoving(GameObject obj)
+    public bool IsMoving(GameObject obj)
     {
         return movementTracker != null && movementTracker.IsObjectMoving(obj);
     }
@@ -477,14 +640,15 @@ public class AdaptiveProgressFormulation : MonoBehaviour
     {
         subtaskProgress[index] = 1f;
     }
+    
     public List<GameObject> GetSubtaskPiecesA()
     {
-        return activeFurnitureConfig.SubtaskPiecesA;
+        return activeFurnitureConfig.CurrentSubtasks.Select(s => s.PieceA).ToList();
     }
 
     public List<GameObject> GetSubtaskPiecesB()
     {
-        return activeFurnitureConfig.SubtaskPiecesB;
+        return activeFurnitureConfig.CurrentSubtasks.Select(s => s.PieceB).ToList();
     }
 
     public Dictionary<int, List<int>> GetGroupedSubtasks()

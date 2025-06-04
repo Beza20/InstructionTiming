@@ -4,8 +4,8 @@ using UnityEngine;
 public class HandGrabbingMonitor : MonoBehaviour
 {
     [Header("Hand Rigidbodies")]
-    [SerializeField] private Rigidbody leftHandRigidbody;
-    [SerializeField] private Rigidbody rightHandRigidbody;
+    [SerializeField] public Rigidbody leftHandRigidbody;
+    [SerializeField] public Rigidbody rightHandRigidbody;
 
     [Header("Furniture Pieces")]
     [SerializeField] private List<GameObject> furniturePieces;

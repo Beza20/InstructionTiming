@@ -9,9 +9,9 @@ public class MovementTrigger : MonoBehaviour
     [Header("Dependencies")]
     [SerializeField] private MovementTracker movementTracker;
     [SerializeField] private ObjectRotationTracker objectTracker;
-   // [SerializeField] private AudioSource beepAudio;
+    // [SerializeField] private AudioSource beepAudio;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
-   
+
 
     [Header("Timing Settings")]
     [SerializeField] private float requiredDuration = 2.0f;   // How long conditions must stay true
@@ -19,7 +19,7 @@ public class MovementTrigger : MonoBehaviour
     [SerializeField] private float cooldownDuration = 3.0f; // Prevent rapid retriggering
 
     [SerializeField] private Transform _glassesTransform;
-    
+
     // State tracking
     private bool _canTrigger = true;
     private float _conditionMetTime = 0f;
@@ -33,11 +33,11 @@ public class MovementTrigger : MonoBehaviour
         if (!_canTrigger) return;
 
         // Check conditions (simplified cumulative checks)
-        bool isTriggerReady = 
+        bool isTriggerReady =
             movementTracker.IsHeadMoving &&          // Cumulative head rotation > threshold
             movementTracker.AreHandsStill &&         // Hands barely moved
             objectTracker.AreObjectsStillA1(5);         // External objects static
-        if(!objectTracker.AreObjectsStillA1(5))
+        if (!objectTracker.AreObjectsStillA1(5))
         {
             Debug.Log("objectTracker is blocking");
         }
@@ -115,8 +115,12 @@ public class MovementTrigger : MonoBehaviour
     // Re-enable triggering after cooldown
     private void ResetTrigger()
     {
+        
         _canTrigger = true;
         _conditionMetTime = 0f;
-        _gracePeriodTimer = 0f;
+      
     }
+
+    
+        
 }

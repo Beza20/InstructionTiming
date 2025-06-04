@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System.IO;
+using System.Text;
+using TMPro;
 
 public class GrabIncorrectPiece : MonoBehaviour
 {
@@ -7,6 +10,7 @@ public class GrabIncorrectPiece : MonoBehaviour
     [SerializeField] private AdaptiveProgressFormulation progressScript;
     [SerializeField] private HandGrabbingMonitor grabbingMonitor;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
+    public ObjectRotationTracker movementTracker;
 
     [Header("Trigger Timing")]
     [SerializeField] private float sustainThreshold = 3f;    // how long an incorrect piece must be held
@@ -14,13 +18,50 @@ public class GrabIncorrectPiece : MonoBehaviour
 
     private float lastTriggerTime = -999f;
     private Dictionary<GameObject, float> grabTimers = new(); // tracks how long each incorrect object is held
+    public TextMeshProUGUI grabbedOBj;
+    public TextMeshProUGUI currentlyheld;
+
+
 
     void Update()
     {
         if (interviewManager == null || progressScript == null || grabbingMonitor == null) return;
+        grabbedOBj.text = "";
+        currentlyheld.text = "";
+        bool triggered = false;
+        float now = Time.time;
 
         int activeGroup = progressScript.GetActiveGroup();
         if (activeGroup == -1) return;
+        Debug.Log(activeGroup + " is the active group");
+
+        if (activeGroup == 3)
+        {
+            if (!progressScript.IsGroupComplete(0) || !progressScript.IsGroupComplete(1) || !progressScript.IsGroupComplete(2))
+            {
+                if (Time.time - lastTriggerTime > triggerCooldown)
+                {
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece");
+                    lastTriggerTime = now;
+                    return;                
+                }
+                 
+            }
+        }
+        if (activeGroup == 1)
+        {
+            if (!progressScript.IsGroupComplete(0))
+            {
+                if (Time.time - lastTriggerTime > triggerCooldown)
+                {
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece");
+                    lastTriggerTime = now;
+                    return;                
+                }
+                 
+            }
+        }
+        
 
         List<int> activeSubtasks = progressScript.GetGroupedSubtasks()[activeGroup];
         var piecesA = progressScript.GetSubtaskPiecesA();
@@ -32,30 +73,71 @@ public class GrabIncorrectPiece : MonoBehaviour
             expectedObjects.Add(piecesA[i]);
             expectedObjects.Add(piecesB[i]);
         }
+        foreach (GameObject obj in expectedObjects)
+        {
+            if (obj == null)
+            {
+                Debug.Log("no expected objs");
+                grabbedOBj.text += "nothing";
+            }
+            else
+            {
+                grabbedOBj.text += activeGroup + obj.name + "\n";
+            }
+        }
 
         var leftGrabbed = grabbingMonitor.grabbedByLeftHand;
         var rightGrabbed = grabbingMonitor.grabbedByRightHand;
 
-        bool triggered = false;
-        float now = Time.time;
+       
 
         // Check incorrect grabs
         List<GameObject> currentlyHeld = new List<GameObject>();
         currentlyHeld.AddRange(leftGrabbed);
         currentlyHeld.AddRange(rightGrabbed);
 
+        foreach (GameObject obj in currentlyHeld)
+        {
+            if (obj == null)
+            {
+                Debug.Log("no expected objs");
+                currentlyheld.text += "nothing";
+            }
+            else
+            {
+                currentlyheld.text += obj.name + "\n";
+            }
+        }
+
         foreach (var obj in currentlyHeld)
         {
             if (obj == null || expectedObjects.Contains(obj.transform.root.gameObject)) continue;
+            currentlyheld.text += obj.name + "is not expected \n";
 
-            // Sustain tracking
+
+            bool isLeft = leftGrabbed.Contains(obj);
+            bool isRight = rightGrabbed.Contains(obj);
+
+            GameObject hand = isLeft ? grabbingMonitor.leftHandRigidbody.gameObject :
+                            isRight ? grabbingMonitor.rightHandRigidbody.gameObject : null;
+            if (IsMovingTogether(grabbingMonitor.leftHandRigidbody.gameObject, obj))
+            {
+                currentlyheld.text += "moving: " + obj.name + "\n";
+            }
+            if (IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, obj))
+            {
+                currentlyheld.text += "moving: " + obj.name + "\n";
+            }
+
+            if (hand == null || !IsMovingTogether(hand, obj)) continue;
+
             if (!grabTimers.ContainsKey(obj))
                 grabTimers[obj] = now;
 
             float heldDuration = now - grabTimers[obj];
             if (heldDuration >= sustainThreshold)
             {
-                Debug.Log($"Sustained incorrect grab: {obj.name} for {heldDuration:F1}s");
+                Debug.Log($"Sustained incorrect grab: {obj.name} for {heldDuration:F1}s with moving hand and object");
                 triggered = true;
             }
         }
@@ -83,14 +165,28 @@ public class GrabIncorrectPiece : MonoBehaviour
 
         if (leftIsA && rightIsA && !IsGrabbingSameObject(leftGrabbed, rightGrabbed))
         {
-            Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA of the active group — possible coordination issue.");
-            triggered = true;
+            GameObject leftObj = leftGrabbed.Count > 0 ? leftGrabbed[0] : null;
+            GameObject rightObj = rightGrabbed.Count > 0 ? rightGrabbed[0] : null;
+
+            if (IsMovingTogether(grabbingMonitor.leftHandRigidbody.gameObject, leftObj) &&
+                IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, rightObj))
+            {
+                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA and are moving with them — coordination issue.");
+                triggered = true;
+            }
         }
 
         if (leftIsB && rightIsB && !IsGrabbingSameObject(leftGrabbed, rightGrabbed))
         {
-            Debug.Log("Both hands are grabbing different objects from SubtaskPiecesB — possible incorrect coordination.");
-            triggered = true;
+            GameObject leftObj = leftGrabbed.Count > 0 ? leftGrabbed[0] : null;
+            GameObject rightObj = rightGrabbed.Count > 0 ? rightGrabbed[0] : null;
+
+            if (IsMovingTogether(grabbingMonitor.leftHandRigidbody.gameObject, leftObj) &&
+                IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, rightObj))
+            {
+                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesB and are moving with them — coordination issue.");
+                triggered = true;
+            }
         }
 
         // Final trigger
@@ -100,7 +196,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             lastTriggerTime = now;
         }
     }
-    
+
     private bool IsGrabbingSameObject(List<GameObject> left, List<GameObject> right)
     {
         foreach (var l in left)
@@ -112,5 +208,32 @@ public class GrabIncorrectPiece : MonoBehaviour
             }
         }
         return false;
+    }
+
+    private bool IsMovingTogether(GameObject hand, GameObject obj)
+    {
+        if (hand == null || obj == null || movementTracker == null)
+        {
+            Debug.LogWarning("IsMovingTogether: Missing reference");
+            return false;
+        }
+
+        // Get the root objects (like AdaptiveProgressFormulation does)
+        GameObject rootHand = hand.transform.root.gameObject;
+        GameObject rootObj = obj.transform.root.gameObject;
+
+        bool handMoving = movementTracker.IsObjectMoving(rootHand);
+        bool objMoving = movementTracker.IsObjectMoving(rootObj);
+
+        Debug.Log($"IsMovingTogether - " +
+                $"Hand '{rootHand.name}' moving: {handMoving}, " +
+                $"Object '{rootObj.name}' moving: {objMoving}");
+
+        return objMoving;
+    }
+    public void ResetTrigger()
+    {
+       Debug.Log("Resetting B2");
+       lastTriggerTime = Time.time; 
     }
 }

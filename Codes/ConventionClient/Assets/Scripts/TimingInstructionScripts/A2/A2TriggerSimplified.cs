@@ -8,12 +8,13 @@ using TMPro;
 public class A2TriggerSimplified : MonoBehaviour
 {
     [SerializeField] private ObjectRotationTracker _tracker;
-    [SerializeField] private Transform _glassesTransform;
+      
     [SerializeField] private AudioSource beepAudio;
     [SerializeField] private AudioSource beepAudioV2;
     [SerializeField] private ConecastHandling _conecastHandler;
     [SerializeField] private TriggerInstructionPlayer instructionPlayer;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
+    private Transform ActiveHead => interviewManager != null ? interviewManager.ActiveHead : null;
 
 
     [Header("Trigger States")]
@@ -21,13 +22,14 @@ public class A2TriggerSimplified : MonoBehaviour
     public bool isShifting = false;  // State for A2 GameObject (Checkbox)
     //[SerializeField] private float _maxReturnTime = 5f;
 
-    public float returnThreshold = 5f; // Degrees
+    public float returnThreshold = 1f; // Degrees
     public float movReturnThreshold = 0.005f;
     public float minReturnTime = 0.5f;
-    public float maxReturnTime = 7f;
+    public float maxReturnTime = 3f;
     [SerializeField] private float _triggerCooldown = 2.5f;
+    
 
-    public float deviationThreshold = 90f;
+    public float deviationThreshold = 250;
     public float shiftingThreshold = 0.05f;
 
     public TextMeshProUGUI rotate;
@@ -35,10 +37,9 @@ public class A2TriggerSimplified : MonoBehaviour
     public TextMeshProUGUI visiblOBj;
 
 
-    private float timeElapsed = 0f; 
+    private float timeElapsed = 0f;
 
     private Dictionary<GameObject, List<float>> returnTimestamps = new Dictionary<GameObject, List<float>>();
-    private Dictionary<GameObject, float> lastTriggerTime = new Dictionary<GameObject, float>();
     private Dictionary<GameObject, float> _lastTriggerTimes = new Dictionary<GameObject, float>();
 
     private class QtrHistorySample
@@ -48,39 +49,43 @@ public class A2TriggerSimplified : MonoBehaviour
 
         public Vector3 pos;
     }
-     private Dictionary<GameObject, List<QtrHistorySample>> _qtrHistory = new();
+    private Dictionary<GameObject, List<QtrHistorySample>> _qtrHistory = new();
+
+    
 
 
     void Update()
     {
         float now = Time.time;
         var logs = _tracker.GetRotationLogs();
-        foreach(var kvp in logs)
+        //removes rotation history that is older than maxreturn time
+        foreach (var kvp in logs)
         {
             GameObject obj = kvp.Key;
-            if (obj == _glassesTransform.gameObject) continue;
+            if (interviewManager != null && obj == ActiveHead?.gameObject) continue;
             kvp.Value.RemoveAll(sample => now - sample.timestamp > maxReturnTime);
 
         }
 
         bool anyRotating = false;
         bool anyMoving = false;
-        
-            
 
-        if (!logs.ContainsKey(_glassesTransform.gameObject)) return;
 
-        HashSet<GameObject> visibleObjects = _conecastHandler.GetObjectsInSight(_glassesTransform);
+
+        if (interviewManager == null || ActiveHead == null || !logs.ContainsKey(ActiveHead.gameObject)) return;
+
+        HashSet<GameObject> visibleObjects = _conecastHandler.GetObjectsInSight(ActiveHead);
         visiblOBj.text = ""; // Clear first
+        rotate.text = "";
         foreach (GameObject piece in visibleObjects)
         {
             visiblOBj.text += piece.name + "\n";
         }
-        rotate.text = "";
+
         foreach (var kvp in logs)
         {
             GameObject obj = kvp.Key;
-            if (obj == _glassesTransform.gameObject) continue;
+            if (interviewManager != null && obj == ActiveHead?.gameObject) continue;
             if (!visibleObjects.Contains(obj)) continue;
 
             List<ObjectRotationTracker.RotationHistory> objectHistory = kvp.Value;
@@ -91,35 +96,35 @@ public class A2TriggerSimplified : MonoBehaviour
             {
                 _lastTriggerTimes[obj] = -_triggerCooldown;
             }
-            rotate.text += (now - _lastTriggerTimes[obj]).ToString() + "\n";
+
 
             // Check cooldown
             if (now - _lastTriggerTimes[obj] < _triggerCooldown)
             {
-                
+
                 continue;
             }
 
             // Get latest orientation samples
             ObjectRotationTracker.RotationHistory latestObjSample = objectHistory[^1];
-            ObjectRotationTracker.RotationHistory latestGlassesSample = _tracker.GetClosestSnapshot(_glassesTransform.gameObject, latestObjSample.timestamp);
+            ObjectRotationTracker.RotationHistory latestGlassesSample = _tracker.GetClosestSnapshot(ActiveHead.gameObject, latestObjSample.timestamp);
             if (latestGlassesSample == null) continue;
-            
+
             if (!_qtrHistory.ContainsKey(obj))
             {
                 _qtrHistory[obj] = new List<QtrHistorySample>();
             }
-            
+
             _qtrHistory[obj].Add(new QtrHistorySample { timestamp = now, Qtr = latestObjSample.rotation, pos = latestObjSample.position });
             _qtrHistory[obj].RemoveAll(sample => now - sample.timestamp > maxReturnTime);
-            
-            
+
+
 
             if (_tracker.IsObjectMovingA2(obj))
             {
                 anyRotating = true;
             }
-            
+
             if (_tracker.IsObjectMoving(obj))
             {
                 anyMoving = true;
@@ -137,74 +142,58 @@ public class A2TriggerSimplified : MonoBehaviour
                 rotate.color = Color.red;
             }
 
-            // Set movement text once, based on anyMoving
-            if (anyMoving)
-            {
-                move.text = "movement exists";
-                move.color = Color.green;
-            }
-            else
-            {
-                move.text = "nothing is moving";
-                move.color = Color.red;
-            }
-            // if (!_tracker.IsObjectMovingA2(obj)) 
-            // {
-            //     // rotate.text = "nothing is rotating";
-            //     // rotate.color = Color.red;
-            //     if (isRotating)
-            //     {
-            //         continue;
-            //     }
-                
-            // }
-            // if (!_tracker.IsObjectMoving(obj)) 
-            // {
-            //     // move.text = "nothing is moving";
-            //     // move.color = Color.red;
-            //     if (isShifting)
-            //     {
-            //         continue;
-            //     }
-            // }
 
-           
 
-            
+
+
             // Check history for return patterns
             Debug.Log("checking history");
             bool hasDeviated = false;
             bool hasMoved = false;
             var history = _qtrHistory[obj];
+
             for (int i = 0; i < history.Count - 1; i++)
             {
+
                 var pastSample = history[i];
                 float age = now - pastSample.timestamp;
                 int k = 0;
-                
+                hasDeviated = false;
+                hasMoved = false;
+
                 if (age >= minReturnTime && age <= maxReturnTime)
                 {
                     float dot = Quaternion.Dot(latestObjSample.rotation.normalized, pastSample.Qtr.normalized);
                     float angularDifference = Mathf.Acos(Mathf.Min(Mathf.Abs(dot), 1f)) * 2f * Mathf.Rad2Deg; // angle in degrees
                     float currentAngleToPast = Mathf.Acos(Mathf.Min(Mathf.Abs(Quaternion.Dot(latestObjSample.rotation.normalized, pastSample.Qtr.normalized)), 1f)) * 2f * Mathf.Rad2Deg;
+                    // float currentAngleToPast = Quaternion.Angle(latestObjSample.rotation, pastSample.Qtr);
 
                     float pos_diff = Vector3.Distance(latestObjSample.position, pastSample.pos);
 
-                   // float currentAngleToPast = Quaternion.Angle(latestObjSample.rotation, pastSample.Qtr);
+                    // float currentAngleToPast = Quaternion.Angle(latestObjSample.rotation, pastSample.Qtr);
                     float totalDeviation = 0;
                     float totalMovement = 0;
 
                     // Look for deviation between 'past' and now
-                    
+
                     for (int j = 0; j < i - 1; j++)
                     {
+
                         var middleSample = history[j];
                         var middleSampleNxt = history[j + 1];
                         float deviation = Quaternion.Angle(middleSample.Qtr, middleSampleNxt.Qtr);
+                        if (deviation < 1f)
+                        {
+                            deviation = 0f;
+                        }
+                        //Debug.Log($"{obj.name} | deviation between frame {j} and {j + 1}: {deviation:F3}");
+
                         float movement = Vector3.Distance(middleSample.pos, middleSampleNxt.pos);
                         totalDeviation += deviation;
                         totalMovement += movement;
-                       
+
+                        // Debug.Log(obj.name.ToString() + ": " + totalDeviation.ToString("F1"));
+
                         if (totalDeviation > deviationThreshold)
                         {
                             //Debug.Log("enough deviation " + totalDeviation);
@@ -214,28 +203,30 @@ public class A2TriggerSimplified : MonoBehaviour
                         }
                         if (totalMovement > shiftingThreshold)
                         {
-                            Debug.Log("enough deviation " + totalMovement);
+                            Debug.Log("enough movement " + totalMovement);
                             hasMoved = true;
                             k = j;
                             break;
                         }
 
                     }
+
                     //Debug.Log("before trigger currentAngleToPast " + currentAngleToPast + "deviation seen " + k + "return at " + i);
-                    
+
 
                     // Final trigger condition: Returned + Deviation happened
-                    if (currentAngleToPast < returnThreshold && hasDeviated && isRotating)
+                    if ((currentAngleToPast < returnThreshold) && hasDeviated && isRotating && anyRotating)
                     {
-                        Debug.Log("currentAngleToPast " + currentAngleToPast + "deviation seen " + k + "return at " + i);
-                        
+                        Debug.Log("currentAngleToPast " + currentAngleToPast + " last seen " + age + " return at " + now + "when return is " + returnThreshold);
+                        rotate.text += obj.name.ToString() + ": " + totalDeviation.ToString("F1") + "\n";
+
                         // Log timestamp
                         if (!returnTimestamps.ContainsKey(obj))
                             returnTimestamps[obj] = new List<float>();
                         returnTimestamps[obj].Add(now);
 
                         // Start interview instead of playing instruction immediately
-                        interviewManager?.TriggerInterview("A2");
+                        interviewManager?.TriggerInterview("A2-rotation");
 
                         // Set cooldown
                         _lastTriggerTimes[obj] = now;
@@ -243,16 +234,34 @@ public class A2TriggerSimplified : MonoBehaviour
                     }
                     if (pos_diff < movReturnThreshold && hasMoved && isShifting)
                     {
-                        
+
                         // Play beep
                         Debug.Log("posdiff " + pos_diff + "pos diff seen " + k + " return at " + i);
-                        interviewManager?.TriggerInterview("A2-2");
+                        interviewManager?.TriggerInterview("A2-shifting");
                         _lastTriggerTimes[obj] = now;
-                        break; 
+                        break;
 
                     }
                 }
             }
         }
     }
+
+    public void ResetTrigger()
+    {
+        Debug.Log("Resetting A2");
+        // Clear cooldown timers
+        _lastTriggerTimes.Clear();
+
+
+
+        rotate.text = "";
+        move.text = "";
+        visiblOBj.text = "";
+        
+       
+       
+    }
+
+    
 }

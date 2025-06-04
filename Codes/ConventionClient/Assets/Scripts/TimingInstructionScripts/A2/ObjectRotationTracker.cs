@@ -10,7 +10,8 @@ public class ObjectRotationTracker : MonoBehaviour
         public Vector3 position;
         public float timestamp;
     }
-    [SerializeField] private Transform _glassesTransform;
+    [SerializeField] private TriggerManagerCoordinator interviewManager;
+    private Transform ActiveHead => interviewManager != null ? interviewManager.ActiveHead : null;
 
     
     public float positionDeltaThreshold = 0.01f;  // Acceptable movement in meters
@@ -24,6 +25,8 @@ public class ObjectRotationTracker : MonoBehaviour
     private float timer = 0f;
     private Dictionary<GameObject, Queue<float>> rotationDeltas = new();
     private Dictionary<GameObject, float> rotationSums = new();
+    private GameObject lastActiveHeadObj;
+
 
     
 
@@ -90,6 +93,20 @@ public class ObjectRotationTracker : MonoBehaviour
         return true;
     }
 
+    void LateUpdate()
+    {
+        if (ActiveHead == null) return;
+
+        GameObject current = ActiveHead.gameObject;
+        if (current != lastActiveHeadObj)
+        {
+            Debug.Log($"Switched tracking from {lastActiveHeadObj?.name} to {current.name}");
+            lastActiveHeadObj = current;
+            if (!rotationLogs.ContainsKey(current))
+                rotationLogs[current] = new List<RotationHistory>();
+        }
+    }
+
     public bool AreObjectsStillA1(float windowSeconds)
     {
         float now = Time.time;
@@ -99,7 +116,7 @@ public class ObjectRotationTracker : MonoBehaviour
         {
             // Skip objects with the "Glasses" tag
             GameObject obj = kvp.Key;
-            if (obj == _glassesTransform.gameObject) continue;
+            if (obj == ActiveHead.gameObject) continue;
 
             List<ObjectRotationTracker.RotationHistory> history = kvp.Value;
             ObjectRotationTracker.RotationHistory past = null;
@@ -154,7 +171,7 @@ public class ObjectRotationTracker : MonoBehaviour
 
         return false;
     }
-    public bool IsObjectMovingA2(GameObject obj, float windowSeconds = 1f, float thresholdDegrees = 5f)
+    public bool IsObjectMovingA2(GameObject obj, float windowSeconds = 1f, float thresholdDegrees = 25f)
     {
         float now = Time.time;
         if (!rotationLogs.ContainsKey(obj)) return false;
@@ -180,6 +197,10 @@ public class ObjectRotationTracker : MonoBehaviour
         float totalRotation = 0f;
         for (int i = 1; i < history.Count; i++)
         {
+            if (Quaternion.Angle(history[i - 1].rotation, history[i].rotation) < 1f)
+            {
+                continue;
+            }
             totalRotation += Quaternion.Angle(history[i - 1].rotation, history[i].rotation);
         }
 

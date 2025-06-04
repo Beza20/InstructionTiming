@@ -21,7 +21,7 @@ public class TriggerManager : MonoBehaviour
     public bool isPActive = false;   // State for B GameObject (Checkbox)
 
     public bool isRActive = false;   // State for B GameObject (Checkbox)
-    
+
 
 
 
@@ -86,9 +86,9 @@ public class TriggerManager : MonoBehaviour
         isRActive = value;
         UpdateGameObjectStates();
     }
-    
 
-    
+
+
 
     public List<MonoBehaviour> GetActiveTriggerScripts()
     {
@@ -114,5 +114,6 @@ public class TriggerManager : MonoBehaviour
 
         return activeTriggers;
     }
+    
 
 }

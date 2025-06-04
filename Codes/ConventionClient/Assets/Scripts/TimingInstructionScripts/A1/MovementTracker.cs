@@ -11,10 +11,7 @@ public class MovementTracker : MonoBehaviour
     [Header("References")]
     [SerializeField] private GameObject leftHand;
     [SerializeField] private GameObject rightHand;
-    [SerializeField] private GameObject head1;
-    [SerializeField] private GameObject head2;
-    [SerializeField] private bool useHead2 = false;
-
+    
     public class RotationHistoryHands
     {
         public Quaternion rotation;
@@ -22,18 +19,18 @@ public class MovementTracker : MonoBehaviour
         public float timestamp;
     }
     private Dictionary<GameObject, List<RotationHistoryHands>> rotationLogsHands = new();
-    private GameObject ActiveHead => useHead2 ? head2 : head1;
+    [SerializeField] private TriggerManagerCoordinator coordinator;
 
-    
+    private Transform ActiveHead => coordinator != null ? coordinator.ActiveHead : null;
+
 
     // Tracking state
     private Queue<float> headRotationDeltas = new Queue<float>();
     private Queue<float> head2RotationDeltas = new Queue<float>();
     private float rotationSum = 0f;
-    private float rotationSum2 = 0f;
     private Vector3 prevLeftHandPos, prevRightHandPos;
     private Quaternion prevHeadRotation;
-    private Quaternion prevHead2Rotation;
+    private Transform lastActiveHead;
 
     // Public properties (simplified conditions)
     public bool IsHeadMoving { get; private set; }
@@ -43,7 +40,9 @@ public class MovementTracker : MonoBehaviour
     {
         rotationLogsHands[leftHand] = new List<RotationHistoryHands>();
         rotationLogsHands[rightHand] = new List<RotationHistoryHands>();
+        lastActiveHead = ActiveHead;
         prevHeadRotation = ActiveHead.transform.rotation;
+        
 
     }
 
@@ -65,30 +64,32 @@ public class MovementTracker : MonoBehaviour
         float cutoff = now - 2f;
         rotationLogsHands[leftHand].RemoveAll(e => e.timestamp < cutoff);
         rotationLogsHands[rightHand].RemoveAll(e => e.timestamp < cutoff);
-        
-        // Track cumulative head rotation over timeWindow
-        float deltaRotation = Quaternion.Angle(prevHeadRotation, ActiveHead.transform.rotation);
+
+        Transform currentHead = ActiveHead;
+
+        if (currentHead != lastActiveHead)
+        {
+            // Reset tracking when the active head changes
+            prevHeadRotation = currentHead.rotation;
+            rotationSum = 0f;
+            headRotationDeltas.Clear();
+            lastActiveHead = currentHead;
+        }
+
+        float deltaRotation = Quaternion.Angle(prevHeadRotation, currentHead.rotation);
         headRotationDeltas.Enqueue(deltaRotation);
         rotationSum += deltaRotation;
-        
 
-
-        // Remove old entries if timeWindow exceeded
         if (headRotationDeltas.Count > timeWindow / Time.deltaTime)
         {
             rotationSum -= headRotationDeltas.Dequeue();
         }
 
-        
-        // Update conditions
         IsHeadMoving = rotationSum >= rotationThreshold;
-        prevHeadRotation = ActiveHead.transform.rotation;
-        AreHandsStill = AreHandsStillA1();
-         
-        
+        prevHeadRotation = currentHead.rotation;
 
-        
-        
+        AreHandsStill = AreHandsStillA1();
+
     }
     public bool AreHandsStillA1(float windowSeconds = 1f)
     {
@@ -97,7 +98,7 @@ public class MovementTracker : MonoBehaviour
 
         foreach (var kvp in logs)
         {
-            
+
             GameObject obj = kvp.Key;
 
             List<RotationHistoryHands> history = kvp.Value;
@@ -130,4 +131,5 @@ public class MovementTracker : MonoBehaviour
     {
         return rotationLogsHands;
     }
+    
 }
