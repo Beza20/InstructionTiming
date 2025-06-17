@@ -12,6 +12,7 @@ public class RandomInterviewTrigger : MonoBehaviour
 
     [Header("Trigger Label")]
     [SerializeField] private string triggerLabel = "random_prompt";
+    private Coroutine triggerLoopCoroutine;
 
     private void Start()
     {
@@ -21,7 +22,7 @@ public class RandomInterviewTrigger : MonoBehaviour
             return;
         }
 
-        StartCoroutine(RandomTriggerLoop());
+        triggerLoopCoroutine = StartCoroutine(RandomTriggerLoop());
     }
 
     private IEnumerator RandomTriggerLoop()
@@ -36,6 +37,25 @@ public class RandomInterviewTrigger : MonoBehaviour
                 Debug.Log($"🔔 Random interview triggered at {Time.time}");
                 interviewManager.TriggerInterview(triggerLabel);
             }
+        }
+    }
+
+    public void PauseTrigger()
+    {
+        if (triggerLoopCoroutine != null)
+        {
+            StopCoroutine(triggerLoopCoroutine);
+            Debug.Log("RandomInterviewTrigger paused");
+            triggerLoopCoroutine = null;
+        }
+    }
+
+    public void ResumeTrigger()
+    {
+        if (triggerLoopCoroutine == null)
+        {
+            triggerLoopCoroutine = StartCoroutine(RandomTriggerLoop());
+            Debug.Log("RandomInterviewTrigger resumed");
         }
     }
 

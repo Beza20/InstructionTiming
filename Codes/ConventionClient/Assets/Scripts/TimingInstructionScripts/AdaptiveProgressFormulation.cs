@@ -223,81 +223,76 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                 return; // wait until 6 seconds have passed
             }
         }
-        float totalProgress = CalculateProgress();
-        progressBar.value = totalProgress;
-        // progressBar2.value = subtaskProgress[1];
-        // progressBar3.value = subtaskProgress[2];
-        // progressBar4.value = subtaskProgress[3];
-        // progressBar5.value = subtaskProgress[4];
-        // progressBar6.value = subtaskProgress[5];
-        progressText.text = $"Progress: {(totalProgress * 100f):F1}%";
+        // float totalProgress = CalculateProgress();
+        // progressBar.value = totalProgress;
+        // progressText.text = $"Progress: {(totalProgress * 100f):F1}%";
     }
 
-   float CalculateProgress()
-    {
-        int activeGroup = GetActiveGroup();
-        Debug.Log($"Active group: {activeGroup}");
+//    float CalculateProgress()
+//     {
+//         int activeGroup = GetActiveGroup();
+//         Debug.Log($"Active group: {activeGroup}");
 
-        // Step 1: Update completed group cache
-        for (int groupID = 0; groupID < groupedSubtasks.Count; groupID++)
-        {
-            if (IsGroupComplete(groupID) && !completedGroups.ContainsKey(groupID))
-            {
-                float groupScore = EvaluateGroupProgress(groupID);
-                completedGroups[groupID] = groupScore;
-                Debug.Log($"Group {groupID} completed with progress {groupScore:F2}!");
-            }
-        }
+//         // Step 1: Update completed group cache
+//         for (int groupID = 0; groupID < groupedSubtasks.Count; groupID++)
+//         {
+//             if (IsGroupComplete(groupID) && !completedGroups.ContainsKey(groupID))
+//             {
+//                 float groupScore = EvaluateGroupProgress(groupID);
+//                 completedGroups[groupID] = groupScore;
+//                 Debug.Log($"Group {groupID} completed with progress {groupScore:F2}!");
+//             }
+//         }
 
-        float completedGroupsProgress = completedGroups.Values.Sum() / groupedSubtasks.Count;
+//         float completedGroupsProgress = completedGroups.Values.Sum() / groupedSubtasks.Count;
 
-        // Step 2: If no active group, return known or group 0
-        if (activeGroup == -1)
-        {
-            if (lastKnownProgress == 0f)
-            {
-                float group0Score = EvaluateGroupProgress(0);
-                if (IsGroupComplete(0))
-                {
-                    lastKnownProgress = completedGroupsProgress;
-                }
-                else
-                {
-                    lastKnownProgress = completedGroupsProgress + group0Score;
-                    lastActiveGroup = 0;
-                }
+//         // Step 2: If no active group, return known or group 0
+//         if (activeGroup == -1)
+//         {
+//             if (lastKnownProgress == 0f)
+//             {
+//                 float group0Score = EvaluateGroupProgress(0);
+//                 if (IsGroupComplete(0))
+//                 {
+//                     lastKnownProgress = completedGroupsProgress;
+//                 }
+//                 else
+//                 {
+//                     lastKnownProgress = completedGroupsProgress + group0Score;
+//                     lastActiveGroup = 0;
+//                 }
                 
-                return lastKnownProgress;
-            }
-            return lastKnownProgress;
-        }
+//                 return lastKnownProgress;
+//             }
+//             return lastKnownProgress;
+//         }
 
-        // Step 3: Block if active group depends on incomplete earlier groups
-        if (sequentialGroups.Contains(activeGroup))
-        {
-            for (int g = 0; g < activeGroup; g++)
-            {
-                if (!IsGroupComplete(g))
-                    return lastKnownProgress;
-            }
-        }
+//         // Step 3: Block if active group depends on incomplete earlier groups
+//         if (sequentialGroups.Contains(activeGroup))
+//         {
+//             for (int g = 0; g < activeGroup; g++)
+//             {
+//                 if (!IsGroupComplete(g))
+//                     return lastKnownProgress;
+//             }
+//         }
         
-        // Step 4: Evaluate active group if not cached
-        float currentGroupProgress = completedGroups.ContainsKey(activeGroup)
-            ? completedGroups[activeGroup]
-            : EvaluateGroupProgress(activeGroup);
+//         // Step 4: Evaluate active group if not cached
+//         float currentGroupProgress = completedGroups.ContainsKey(activeGroup)
+//             ? completedGroups[activeGroup]
+//             : EvaluateGroupProgress(activeGroup);
 
-        // Step 5: Final aggregation
-        float totalProgress = completedGroupsProgress;
-        if (!completedGroups.ContainsKey(activeGroup))
-        {
-            totalProgress += currentGroupProgress;
-        }
+//         // Step 5: Final aggregation
+//         float totalProgress = completedGroupsProgress;
+//         if (!completedGroups.ContainsKey(activeGroup))
+//         {
+//             totalProgress += currentGroupProgress;
+//         }
 
-        lastKnownProgress = totalProgress;
-        lastActiveGroup = activeGroup;
-        return totalProgress;
-    }
+//         lastKnownProgress = totalProgress;
+//         lastActiveGroup = activeGroup;
+//         return totalProgress;
+//     }
 
     
 
@@ -327,7 +322,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                 chainScore /= chain.Count;
                 bestChainScore = Mathf.Max(bestChainScore, chainScore);
             }
-            //Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
+            Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
             return bestChainScore;
 
         }
@@ -385,7 +380,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             //Debug.Log($"Evaluating group {groupID} and best chain score: {bestChainScore}");
             return bestChainScore;
             
-            return bestChainScore;
+        
         }
         if (groupID == 3 && (!IsGroupComplete(0) || !IsGroupComplete(1) || !IsGroupComplete(2)))
         {
@@ -498,6 +493,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
             //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);
             if (subtaskProgress[i] < idealProgress)
             {
+                Debug.Log("subtask progress of " + i + "is " + subtaskProgress[i]);
                 if (groupID == 0 && win_counter < 3 && subtask_pos == groupedSubtasks[groupID].Count - 1)
                 {
                     return false;
@@ -509,8 +505,9 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                     return false;
 
                 }
-                if ((groupID == 3))
+                if (groupID == 3)
                 {
+                    
                     return false;
                 }
                 //Debug.Log("subtask progress of checking completion " + i + " is " + subtaskProgress[i]);    
@@ -526,17 +523,44 @@ public class AdaptiveProgressFormulation : MonoBehaviour
         Debug.Log("group " + groupID + " is complete"  );
         return true;
     }
+
+    public int currentGrp3Subtask()
+    {
+        var subtaskIndices = groupedSubtasks[3];
+        foreach (int i in subtaskIndices)
+        {
+            if (!IsGrp3SubtaskComplete(i))
+            {
+                return i;
+            }
+
+        }
+        return -1;
+        
+    }
+
+    public bool IsGrp3SubtaskComplete(int subtaskIndex)
+    {
+        if (subtaskProgress[subtaskIndex] > idealProgress)
+        {
+            return true;
+        }
+        return false;
+
+
+    }
     public bool IsSubtaskComplete(int groupID)
     {
         var subtaskIndices = groupedSubtasks[groupID];
         foreach (int i in subtaskIndices)
         {
             Debug.Log("subtaskprogress is " + subtaskProgress[i]);
-            if (subtaskProgress[i] > idealProgress){
-                
+            if (subtaskProgress[i] > idealProgress)
+            {
+
                 return true;
             }
-           
+
         }
         Debug.Log("group is not complete: " + groupID);
         return false;

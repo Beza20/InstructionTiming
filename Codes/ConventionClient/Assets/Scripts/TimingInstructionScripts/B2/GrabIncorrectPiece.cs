@@ -41,12 +41,13 @@ public class GrabIncorrectPiece : MonoBehaviour
             {
                 if (Time.time - lastTriggerTime > triggerCooldown)
                 {
-                    interviewManager?.TriggerInterview("B2-grab incorrect piece");
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece-active-grp3-whilst0,1,2-notComplete");
                     lastTriggerTime = now;
-                    return;                
+                    return;
                 }
-                 
+
             }
+           
         }
         if (activeGroup == 1)
         {
@@ -54,7 +55,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             {
                 if (Time.time - lastTriggerTime > triggerCooldown)
                 {
-                    interviewManager?.TriggerInterview("B2-grab incorrect piece");
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece-activegrp1-whilst0-notcomplete");
                     lastTriggerTime = now;
                     return;                
                 }
@@ -63,7 +64,25 @@ public class GrabIncorrectPiece : MonoBehaviour
         }
         
 
-        List<int> activeSubtasks = progressScript.GetGroupedSubtasks()[activeGroup];
+        List<int> activeSubtasks = new List<int>();
+
+        if (activeGroup == 3)
+        {
+            int currentGrp3task = progressScript.currentGrp3Subtask();
+            if (currentGrp3task != -1)
+            {
+                activeSubtasks.Add(currentGrp3task);
+                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[0]);
+                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[1]);
+                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[2]);
+
+            }
+        }
+        else
+        {
+            activeSubtasks = progressScript.GetGroupedSubtasks()[activeGroup];
+        }
+
         var piecesA = progressScript.GetSubtaskPiecesA();
         var piecesB = progressScript.GetSubtaskPiecesB();
 
@@ -192,7 +211,7 @@ public class GrabIncorrectPiece : MonoBehaviour
         // Final trigger
         if (triggered && Time.time - lastTriggerTime > triggerCooldown)
         {
-            interviewManager?.TriggerInterview("B2");
+            interviewManager?.TriggerInterview("B2-grab-incorrectpiece");
             lastTriggerTime = now;
         }
     }

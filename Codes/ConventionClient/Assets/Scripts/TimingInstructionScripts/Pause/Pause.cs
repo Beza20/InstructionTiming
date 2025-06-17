@@ -68,7 +68,7 @@ public class Pause : MonoBehaviour
         sth_moving = false;
         foreach (GameObject obj in tracked_objects)
         {
-            if (rotationTracker.IsObjectMoving(obj) && obj.name != "glass1")
+            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2" ))
             {
                 Debug.Log("sth is moving so no pause");
                 sth_moving = true;

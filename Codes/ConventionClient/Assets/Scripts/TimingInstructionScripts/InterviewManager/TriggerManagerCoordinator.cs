@@ -37,6 +37,7 @@ public class TriggerManagerCoordinator : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("useHead2 at Start: " + useHead2);
         string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
         string filename = $"TriggerInterviewLog_{timestamp}.csv";
         sessionLogFilePath = Path.Combine(Application.persistentDataPath, filename);
@@ -113,16 +114,30 @@ public class TriggerManagerCoordinator : MonoBehaviour
         ResumeTriggers();
     }
 
-    private void PauseTriggers()
-    {
-        foreach (var script in triggerScripts)
-            script.enabled = false;
-    }
-
-    private void ResumeTriggers()
+    public void PauseTriggers()
     {
         foreach (var script in triggerScripts)
         {
+            var pauseMethod = script.GetType().GetMethod("PauseTrigger");
+            if (pauseMethod != null)
+            {
+                pauseMethod.Invoke(script, null);
+            }
+            script.enabled = false;
+            Debug.Log(script.name + "is disabled");
+        }
+    }
+
+    public void ResumeTriggers()
+    {
+        foreach (var script in triggerScripts)
+        {
+
+            var resumeMethod = script.GetType().GetMethod("ResumeTrigger");
+            if (resumeMethod != null)
+            {
+                resumeMethod.Invoke(script, null);
+            }
             script.enabled = true;
             // Check if the script has a ResetTrigger method before calling it
             var method = script.GetType().GetMethod("ResetTrigger");

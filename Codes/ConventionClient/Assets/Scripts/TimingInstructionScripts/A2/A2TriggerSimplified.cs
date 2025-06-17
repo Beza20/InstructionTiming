@@ -8,7 +8,7 @@ using TMPro;
 public class A2TriggerSimplified : MonoBehaviour
 {
     [SerializeField] private ObjectRotationTracker _tracker;
-      
+
     [SerializeField] private AudioSource beepAudio;
     [SerializeField] private AudioSource beepAudioV2;
     [SerializeField] private ConecastHandling _conecastHandler;
@@ -27,7 +27,7 @@ public class A2TriggerSimplified : MonoBehaviour
     public float minReturnTime = 0.5f;
     public float maxReturnTime = 3f;
     [SerializeField] private float _triggerCooldown = 2.5f;
-    
+
 
     public float deviationThreshold = 250;
     public float shiftingThreshold = 0.05f;
@@ -51,7 +51,7 @@ public class A2TriggerSimplified : MonoBehaviour
     }
     private Dictionary<GameObject, List<QtrHistorySample>> _qtrHistory = new();
 
-    
+
 
 
     void Update()
@@ -75,6 +75,13 @@ public class A2TriggerSimplified : MonoBehaviour
         if (interviewManager == null || ActiveHead == null || !logs.ContainsKey(ActiveHead.gameObject)) return;
 
         HashSet<GameObject> visibleObjects = _conecastHandler.GetObjectsInSight(ActiveHead);
+        // if (interviewManager != null && interviewManager.ActiveHead != null)
+        // {
+        //     Debug.Log("tring to draw");
+        //     var origin = interviewManager.ActiveHead;
+        //     Debug.DrawRay(origin.position, origin.forward * 3f, Color.yellow);
+        //     _conecastHandler.DrawGizmos(origin); // you can also test GetObjectsInSight(origin)
+        // }
         visiblOBj.text = ""; // Clear first
         rotate.text = "";
         foreach (GameObject piece in visibleObjects)
@@ -147,7 +154,7 @@ public class A2TriggerSimplified : MonoBehaviour
 
 
             // Check history for return patterns
-            Debug.Log("checking history");
+           // Debug.Log("checking history");
             bool hasDeviated = false;
             bool hasMoved = false;
             var history = _qtrHistory[obj];
@@ -182,13 +189,19 @@ public class A2TriggerSimplified : MonoBehaviour
                         var middleSample = history[j];
                         var middleSampleNxt = history[j + 1];
                         float deviation = Quaternion.Angle(middleSample.Qtr, middleSampleNxt.Qtr);
-                        if (deviation < 1f)
+                        if (deviation < 0.85f)
                         {
                             deviation = 0f;
                         }
                         //Debug.Log($"{obj.name} | deviation between frame {j} and {j + 1}: {deviation:F3}");
 
                         float movement = Vector3.Distance(middleSample.pos, middleSampleNxt.pos);
+
+                        if (movement < 0.008f)
+                        {
+                           
+                            movement = 0f;
+                        }
                         totalDeviation += deviation;
                         totalMovement += movement;
 
@@ -203,7 +216,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         }
                         if (totalMovement > shiftingThreshold)
                         {
-                            Debug.Log("enough movement " + totalMovement);
+                            Debug.Log("enough movemern " + totalMovement);
                             hasMoved = true;
                             k = j;
                             break;
@@ -258,9 +271,20 @@ public class A2TriggerSimplified : MonoBehaviour
         rotate.text = "";
         move.text = "";
         visiblOBj.text = "";
-        
-       
-       
+
+
+
+    }
+    private void OnDrawGizmosSelected()
+    {
+        if (interviewManager == null) return;
+
+    #if UNITY_EDITOR
+        if (UnityEditor.EditorApplication.isPlaying && interviewManager.ActiveHead != null)
+        {
+            _conecastHandler.DrawGizmos(interviewManager.ActiveHead);
+        }
+    #endif
     }
 
     
