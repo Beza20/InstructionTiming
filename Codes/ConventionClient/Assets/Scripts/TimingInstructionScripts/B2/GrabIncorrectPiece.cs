@@ -20,11 +20,26 @@ public class GrabIncorrectPiece : MonoBehaviour
     private Dictionary<GameObject, float> grabTimers = new(); // tracks how long each incorrect object is held
     public TextMeshProUGUI grabbedOBj;
     public TextMeshProUGUI currentlyheld;
+    private float startDelay = 15f;
+    private float elapsedTime = 0f;
+    private bool started = false;
 
 
 
     void Update()
     {
+        if (!started)
+        {
+            elapsedTime += Time.deltaTime;
+            if (elapsedTime >= startDelay)
+            {
+                started = true;
+            }
+            else
+            {
+                return; // wait until 6 seconds have passed
+            }
+        }
         if (interviewManager == null || progressScript == null || grabbingMonitor == null) return;
         grabbedOBj.text = "";
         currentlyheld.text = "";
@@ -190,7 +205,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             if (IsMovingTogether(grabbingMonitor.leftHandRigidbody.gameObject, leftObj) &&
                 IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, rightObj))
             {
-                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA and are moving with them — coordination issue.");
+                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA and are moving with them — coordination issue." );
                 triggered = true;
             }
         }

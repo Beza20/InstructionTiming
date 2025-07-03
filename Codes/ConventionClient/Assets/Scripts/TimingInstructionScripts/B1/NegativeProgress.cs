@@ -13,7 +13,7 @@ public class NegativeProgress : MonoBehaviour
     [SerializeField] private AdaptiveProgressFormulation progressScript;
 
     [Header("Monitoring Settings")]
-    [SerializeField] private float checkInterval = 0.05f; // in seconds
+    [SerializeField] private float checkInterval = 0.005f; // in seconds
     [SerializeField] private float durationThreshold = 0.1f; // how long without improvement before triggering
 
     [Header("Optional Feedback")]
@@ -22,7 +22,7 @@ public class NegativeProgress : MonoBehaviour
     [SerializeField] private TriggerManagerCoordinator interviewManager;
     [SerializeField] private string triggerLabel = "negative_progress";
     private Queue<float> progressHistory = new Queue<float>();
-    [SerializeField] private int historyWindowSize = 300; // Number of samples (e.g., last 5 seconds)
+    [SerializeField] private int historyWindowSize = 180; // Number of samples (last 3 seconds)
     private float smoothedProgress = 0f;
     [SerializeField] private float alpha = 0.1f;
     public Slider progressBar7;
@@ -66,7 +66,12 @@ public class NegativeProgress : MonoBehaviour
             checkTimer = 0f;
 
             int activeGroup = progressScript.GetActiveGroup();
-            if (activeGroup == -1) return;
+            if (activeGroup == -1)
+            {
+                Debug.Log("stuck cuz active grp is -1");
+                return;
+            }
+
             Debug.Log("passing because active grp for neg prgress is " + activeGroup);
 
             float currentProgress = progressScript.EvaluateGroupProgress(activeGroup);
@@ -92,26 +97,38 @@ public class NegativeProgress : MonoBehaviour
 
 
 
-            // Compare smoothed progress to previous smoothed progress
-            if (!awaitingResponse && (averageProgress >= (filteredProgress + 0.05f)) && (last_trigger > cooldown_neg))
+            float epsilon = 0.00005f;  // small tolerance
+            float? lastVal = null;
+            int downticks = 0;
+
+            foreach (var p in progressHistory)
             {
-                Debug.Log("negative detected" + last_trigger);
+                if (lastVal.HasValue && p < lastVal.Value - epsilon)
+                {
+                    downticks++;
+                }
+                lastVal = p;
+            }
+
+            float downtickRatio = (float)downticks / (progressHistory.Count - 1);  // -1 to skip first
+
+            //Debug.Log($"📊 Downticks: {downticks} / {progressHistory.Count - 1} = {downtickRatio:P1}");
+            float delta = progressHistory.Peek() - progressHistory.Last();
+
+
+            if (!awaitingResponse &&
+                downtickRatio >= 0.75f &&  // <-- you can tune this
+                delta >= 0.1f &&
+                last_trigger > cooldown_neg)
+            {
+                //Debug.Log($"📉 Graceful decline detected. Δ={delta:F3}, downtickRatio = {downtickRatio:P1}, Triggering.");
                 last_trigger = 0;
                 AskQuestion(questionPAudio);
-                timeSinceImprovement += checkInterval;
-            }
-            else
-            {
                 timeSinceImprovement = 0f;
             }
 
-
-            if (!awaitingResponse && (timeSinceImprovement >= durationThreshold))
-            {
-                AskQuestion(questionPAudio);
-                timeSinceImprovement = 0f;
-            }
         }
+
     }
     private void AskQuestion(AudioClip clip)
     {
