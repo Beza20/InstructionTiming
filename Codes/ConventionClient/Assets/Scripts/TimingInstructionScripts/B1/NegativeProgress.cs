@@ -13,18 +13,33 @@ public class NegativeProgress : MonoBehaviour
     [SerializeField] private AdaptiveProgressFormulation progressScript;
 
     [Header("Monitoring Settings")]
-    [SerializeField] private float checkInterval = 0.005f; // in seconds
+    [SerializeField] private float checkInterval = 10; // in seconds
     [SerializeField] private float durationThreshold = 0.1f; // how long without improvement before triggering
+
+    private class TimedProgress
+    {
+        public float progress;
+        public float timestamp;
+
+        public TimedProgress(float progress, float timestamp)
+        {
+            this.progress = progress;
+            this.timestamp = timestamp;
+        }
+    }
+
 
     [Header("Optional Feedback")]
     [SerializeField] private AudioSource warningBeep;
     [SerializeField] private bool logWarnings = true;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
     [SerializeField] private string triggerLabel = "negative_progress";
-    private Queue<float> progressHistory = new Queue<float>();
-    [SerializeField] private int historyWindowSize = 180; // Number of samples (last 3 seconds)
+    private Queue<TimedProgress> progressHistory = new Queue<TimedProgress>();
+    [SerializeField] private float historyDurationSeconds = 3f;  // sliding window duration
     private float smoothedProgress = 0f;
     [SerializeField] private float alpha = 0.1f;
+
+    
     public Slider progressBar7;
     public Slider progressBar8;
     private float filteredProgress = 0f;
@@ -44,6 +59,9 @@ public class NegativeProgress : MonoBehaviour
     public AudioSource questionAudioSource;
     public AudioClip questionPAudio;
 
+    
+
+
     void Start()
     {
         yesButton.onClick.AddListener(() => OnAnswer("Yes"));
@@ -60,10 +78,10 @@ public class NegativeProgress : MonoBehaviour
         checkTimer += Time.deltaTime;
         last_trigger += Time.deltaTime;
 
-
         if (checkTimer >= checkInterval)
         {
             checkTimer = 0f;
+            float now = Time.time;
 
             int activeGroup = progressScript.GetActiveGroup();
             if (activeGroup == -1)
@@ -72,64 +90,59 @@ public class NegativeProgress : MonoBehaviour
                 return;
             }
 
-            Debug.Log("passing because active grp for neg prgress is " + activeGroup);
+            Debug.Log("passing because active grp for neg progress is " + activeGroup);
 
             float currentProgress = progressScript.EvaluateGroupProgress(activeGroup);
-            // Debug.Log("cureent progresss " + currentProgress);
             filteredProgress = alpha * currentProgress + (1 - alpha) * filteredProgress;
 
-            // Add to history
-            progressHistory.Enqueue(filteredProgress);
-            if (progressHistory.Count > historyWindowSize)
+            // Add current progress with timestamp to the queue
+            progressHistory.Enqueue(new TimedProgress(filteredProgress, now));
+
+            // Trim old entries
+            while (progressHistory.Count > 0 && now - progressHistory.Peek().timestamp > historyDurationSeconds)
+            {
                 progressHistory.Dequeue();
+            }
 
-            // Compute moving average
+            // Analyze progress history
+            const float epsilon = 0.00005f;
             float sum = 0f;
-            foreach (var p in progressHistory)
-                sum += p;
-
-            float averageProgress = sum / progressHistory.Count;
-            progressBar7.value = averageProgress;
-            progressBar8.value = filteredProgress;
-
-            // Debug.Log("VERAGE progresss " + averageProgress);
-            // Debug.Log("filter progresss " + filteredProgress);
-
-
-
-            float epsilon = 0.00005f;  // small tolerance
-            float? lastVal = null;
+            TimedProgress lastVal = null;
             int downticks = 0;
 
-            foreach (var p in progressHistory)
+            foreach (var entry in progressHistory)
             {
-                if (lastVal.HasValue && p < lastVal.Value - epsilon)
+                sum += entry.progress;
+
+                if (lastVal != null && entry.progress < lastVal.progress - epsilon)
                 {
                     downticks++;
                 }
-                lastVal = p;
+
+                lastVal = entry;
             }
 
-            float downtickRatio = (float)downticks / (progressHistory.Count - 1);  // -1 to skip first
+            float averageProgress = progressHistory.Count > 0 ? sum / progressHistory.Count : 0f;
+            float downtickRatio = (progressHistory.Count > 1) ? (float)downticks / (progressHistory.Count - 1) : 0f;
+            float delta = progressHistory.Peek().progress - progressHistory.Last().progress;
 
-            //Debug.Log($"📊 Downticks: {downticks} / {progressHistory.Count - 1} = {downtickRatio:P1}");
-            float delta = progressHistory.Peek() - progressHistory.Last();
+            // Update UI
+            progressBar7.value = averageProgress;
+            progressBar8.value = filteredProgress;
 
-
+            // Trigger condition
             if (!awaitingResponse &&
-                downtickRatio >= 0.75f &&  // <-- you can tune this
+                downtickRatio >= 0.75f &&
                 delta >= 0.1f &&
                 last_trigger > cooldown_neg)
             {
-                //Debug.Log($"📉 Graceful decline detected. Δ={delta:F3}, downtickRatio = {downtickRatio:P1}, Triggering.");
                 last_trigger = 0;
                 AskQuestion(questionPAudio);
                 timeSinceImprovement = 0f;
             }
-
         }
-
     }
+
     private void AskQuestion(AudioClip clip)
     {
         questionAudioSource.clip = clip;
