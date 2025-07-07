@@ -98,35 +98,29 @@ public class MovementTracker : MonoBehaviour
 
         foreach (var kvp in logs)
         {
-
-            GameObject obj = kvp.Key;
-
             List<RotationHistoryHands> history = kvp.Value;
-            RotationHistoryHands past = null;
-            bool foundPast = false;
+            float totalDistance = 0f;
 
-            // Find the first log entry older than the time window
-            for (int i = history.Count - 1; i >= 0; i--)
+            // Step through consecutive points in the time window
+            for (int i = 1; i < history.Count; i++)
             {
-                if (now - history[i].timestamp >= windowSeconds)
+                if (now - history[i].timestamp <= windowSeconds)
                 {
-                    past = history[i];
-                    foundPast = true;
-                    break;
+                    float segmentDist = Vector3.Distance(history[i - 1].position, history[i].position);
+                    totalDistance += segmentDist;
                 }
             }
 
-            // Check position change if history exists
-            if (foundPast)
+            if (totalDistance > positionThreshold)
             {
-                float distance = Vector3.Distance(kvp.Key.transform.position, past.position);
-                if (distance > positionThreshold)
-                    return false;
+                // Exceeded movement threshold
+                return false;
             }
         }
 
         return true;
     }
+
     public Dictionary<GameObject, List<RotationHistoryHands>> GetHandRotationLogs()
     {
         return rotationLogsHands;
