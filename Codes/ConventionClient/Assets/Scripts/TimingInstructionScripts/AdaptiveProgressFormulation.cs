@@ -542,17 +542,6 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                         return 2;
                     }
 
-                    if (groupID == 3 && !IsGroupComplete(0))
-                    {
-                        Debug.Log("Group 3 blocked: Group 0 not complete.");
-                        return 0;
-                    }
-                    if (groupID == 3 && !IsGroupComplete(1))
-                    {
-                        Debug.Log("Group 3 blocked: Group 1 not complete.");
-                        return 1;
-                    }
-
                     if (groupID == 3 && !IsGroupComplete(2))
                     {
                         Debug.Log("Group 3 blocked: Group 2 not complete.");
@@ -567,7 +556,7 @@ public class AdaptiveProgressFormulation : MonoBehaviour
                             if (!IsGroupComplete(i))
                             {
                                 Debug.Log($"Group 3 blocked: Group {i} not complete.");
-                                return -1;
+                                return 0;
                             }
                         }
                     }

@@ -14,6 +14,8 @@ public class A2TriggerSimplified : MonoBehaviour
     [SerializeField] private ConecastHandling _conecastHandler;
     [SerializeField] private TriggerInstructionPlayer instructionPlayer;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
+    [SerializeField] private HandGrabbingMonitor grabbingMonitor;
+
     private Transform ActiveHead => interviewManager != null ? interviewManager.ActiveHead : null;
 
 
@@ -50,6 +52,7 @@ public class A2TriggerSimplified : MonoBehaviour
         public Vector3 pos;
     }
     private Dictionary<GameObject, List<QtrHistorySample>> _qtrHistory = new();
+    private float lastTriggerTime = 0;
 
 
 
@@ -66,6 +69,9 @@ public class A2TriggerSimplified : MonoBehaviour
             kvp.Value.RemoveAll(sample => now - sample.timestamp > maxReturnTime);
 
         }
+        List<GameObject> grabbedObjects = new List<GameObject>();
+        grabbedObjects.AddRange(grabbingMonitor.grabbedByLeftHand);
+        grabbedObjects.AddRange(grabbingMonitor.grabbedByRightHand);
 
         bool anyRotating = false;
         bool anyMoving = false;
@@ -84,9 +90,10 @@ public class A2TriggerSimplified : MonoBehaviour
         // }
         visiblOBj.text = ""; // Clear first
         rotate.text = "";
-        foreach (GameObject piece in visibleObjects)
+        foreach (GameObject piece in grabbedObjects)
         {
-            visiblOBj.text += piece.name + "\n";
+            if (visibleObjects.Contains(piece.transform.root.gameObject))
+                visiblOBj.text += piece.name + "\n";
         }
 
         foreach (var kvp in logs)
@@ -94,6 +101,20 @@ public class A2TriggerSimplified : MonoBehaviour
             GameObject obj = kvp.Key;
             if (interviewManager != null && obj == ActiveHead?.gameObject) continue;
             if (!visibleObjects.Contains(obj)) continue;
+            bool isGrabbed = false;
+            foreach (GameObject piece in grabbedObjects)
+            {
+                if (obj == piece.transform.root.gameObject)
+                {
+                    isGrabbed = true;
+                    break;
+                }
+            }
+
+            if (!isGrabbed)
+            {
+                continue; // skip this object — not grabbed
+            }
 
             List<ObjectRotationTracker.RotationHistory> objectHistory = kvp.Value;
             if (objectHistory.Count < 2) continue;
@@ -103,6 +124,7 @@ public class A2TriggerSimplified : MonoBehaviour
             {
                 _lastTriggerTimes[obj] = -_triggerCooldown;
             }
+
 
 
             // Check cooldown
@@ -149,12 +171,14 @@ public class A2TriggerSimplified : MonoBehaviour
                 rotate.color = Color.red;
             }
 
+            Debug.Log(obj.name + " is in view and grabbed and evaluated for A2");
+
 
 
 
 
             // Check history for return patterns
-           // Debug.Log("checking history");
+            // Debug.Log("checking history");
             bool hasDeviated = false;
             bool hasMoved = false;
             var history = _qtrHistory[obj];
@@ -171,9 +195,9 @@ public class A2TriggerSimplified : MonoBehaviour
                 if (age >= minReturnTime && age <= maxReturnTime)
                 {
                     float dot = Quaternion.Dot(latestObjSample.rotation.normalized, pastSample.Qtr.normalized);
-                    float angularDifference = Mathf.Acos(Mathf.Min(Mathf.Abs(dot), 1f)) * 2f * Mathf.Rad2Deg; // angle in degrees
-                    float currentAngleToPast = Mathf.Acos(Mathf.Min(Mathf.Abs(Quaternion.Dot(latestObjSample.rotation.normalized, pastSample.Qtr.normalized)), 1f)) * 2f * Mathf.Rad2Deg;
-                    // float currentAngleToPast = Quaternion.Angle(latestObjSample.rotation, pastSample.Qtr);
+                   // float angularDifference = Mathf.Acos(Mathf.Min(Mathf.Abs(dot), 1f)) * 2f * Mathf.Rad2Deg; // angle in degrees
+                    //float currentAngleToPast = Mathf.Acos(Mathf.Min(Mathf.Abs(Quaternion.Dot(latestObjSample.rotation.normalized, pastSample.Qtr.normalized)), 1f)) * 2f * Mathf.Rad2Deg;
+                    float currentAngleToPast = Quaternion.Angle(latestObjSample.rotation, pastSample.Qtr);
 
                     float pos_diff = Vector3.Distance(latestObjSample.position, pastSample.pos);
 
@@ -197,7 +221,7 @@ public class A2TriggerSimplified : MonoBehaviour
 
                         float movement = Vector3.Distance(middleSample.pos, middleSampleNxt.pos);
 
-                        if (movement < 0.008f)
+                        if (movement < 0.01f)
                         {
                            
                             movement = 0f;
@@ -216,7 +240,7 @@ public class A2TriggerSimplified : MonoBehaviour
                         }
                         if (totalMovement > shiftingThreshold)
                         {
-                            Debug.Log("enough movemern " + totalMovement);
+                            Debug.Log("enough movement " + totalMovement + "for " + obj.name);
                             hasMoved = true;
                             k = j;
                             break;
@@ -228,7 +252,7 @@ public class A2TriggerSimplified : MonoBehaviour
 
 
                     // Final trigger condition: Returned + Deviation happened
-                    if ((currentAngleToPast < returnThreshold) && hasDeviated && isRotating && anyRotating)
+                    if ((currentAngleToPast < returnThreshold) && hasDeviated && isRotating && anyRotating && (now - lastTriggerTime > _triggerCooldown))
                     {
                         Debug.Log("currentAngleToPast " + currentAngleToPast + " last seen " + age + " return at " + now + "when return is " + returnThreshold);
                         rotate.text += obj.name.ToString() + ": " + totalDeviation.ToString("F1") + "\n";
@@ -239,20 +263,24 @@ public class A2TriggerSimplified : MonoBehaviour
                         returnTimestamps[obj].Add(now);
 
                         // Start interview instead of playing instruction immediately
-                        interviewManager?.TriggerInterview("A2-rotation");
+                        interviewManager?.TriggerInterview("A2-rotation for object: " + obj.name);
 
                         // Set cooldown
                         _lastTriggerTimes[obj] = now;
+                        lastTriggerTime = now;
                         break; // Triggered once per object per check
+                        
                     }
-                    if (pos_diff < movReturnThreshold && hasMoved && isShifting)
+                    if (pos_diff < movReturnThreshold && hasMoved && isShifting && (now - lastTriggerTime > _triggerCooldown ))
                     {
 
                         // Play beep
                         Debug.Log("posdiff " + pos_diff + "pos diff seen " + k + " return at " + i);
-                        interviewManager?.TriggerInterview("A2-shifting");
+                        interviewManager?.TriggerInterview("A2-shifting for object: " + obj.name);
                         _lastTriggerTimes[obj] = now;
+                        lastTriggerTime = now;
                         break;
+
 
                     }
                 }

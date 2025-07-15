@@ -49,7 +49,7 @@ public class NegativeProgress : MonoBehaviour
     private float lastCheckedProgress = 0f;
     private float timeSinceImprovement = 0f;
     private float checkTimer = 0f;
-    private float cooldown_neg = 8;
+    private float cooldown_neg = 5;
     private float last_trigger = 0;
     [Header("UI Buttons")]
     public Button yesButton;
@@ -80,7 +80,6 @@ public class NegativeProgress : MonoBehaviour
 
         if (checkTimer >= checkInterval)
         {
-            checkTimer = 0f;
             float now = Time.time;
 
             int activeGroup = progressScript.GetActiveGroup();

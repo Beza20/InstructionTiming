@@ -50,33 +50,6 @@ public class GrabIncorrectPiece : MonoBehaviour
         if (activeGroup == -1) return;
         Debug.Log(activeGroup + " is the active group");
 
-        if (activeGroup == 3)
-        {
-            if (!progressScript.IsGroupComplete(0) || !progressScript.IsGroupComplete(1) || !progressScript.IsGroupComplete(2))
-            {
-                if (Time.time - lastTriggerTime > triggerCooldown)
-                {
-                    interviewManager?.TriggerInterview("B2-grab incorrect piece-active-grp3-whilst0,1,2-notComplete");
-                    lastTriggerTime = now;
-                    return;
-                }
-
-            }
-           
-        }
-        if (activeGroup == 1)
-        {
-            if (!progressScript.IsGroupComplete(0))
-            {
-                if (Time.time - lastTriggerTime > triggerCooldown)
-                {
-                    interviewManager?.TriggerInterview("B2-grab incorrect piece-activegrp1-whilst0-notcomplete");
-                    lastTriggerTime = now;
-                    return;                
-                }
-                 
-            }
-        }
         
 
         List<int> activeSubtasks = new List<int>();

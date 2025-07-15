@@ -17,6 +17,7 @@ public class MovementTrigger : MonoBehaviour
     [SerializeField] private float requiredDuration = 2.0f;   // How long conditions must stay true
     [SerializeField] private float gracePeriod = 0.3f;      // Brief interruptions allowed
     [SerializeField] private float cooldownDuration = 3.0f; // Prevent rapid retriggering
+    
 
     [SerializeField] private Transform _glassesTransform;
 
@@ -67,16 +68,16 @@ public class MovementTrigger : MonoBehaviour
             Debug.Log("trigger stays ready");
             HandleSuccessfulCondition();
         }
-        else
-        {
-            HandleFailedCondition();
-        }
+        // else
+        // {
+        //     HandleFailedCondition();
+        // }
     }
 
     // Called when ALL conditions are met
     private void HandleSuccessfulCondition()
     {
-        _gracePeriodTimer = 0f; // Reset grace period
+        //_gracePeriodTimer = 0f; // Reset grace period
         _conditionMetTime += Time.deltaTime;
 
         if (_conditionMetTime >= requiredDuration)

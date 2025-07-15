@@ -32,7 +32,7 @@ public class Pause : MonoBehaviour
     [Header("Trigger Settings")]
     [SerializeField] private float freezeThreshold = 3f;
 
-    private float cooldown_neg = 8;
+    private float cooldown_neg = 5f;
     private float last_trigger = 0;
 
     //public UnityEvent OnHesitationDetected;
@@ -92,12 +92,19 @@ public class Pause : MonoBehaviour
 
 
 
-        foreach (GameObject obj in grabbedObjects)
+        foreach (GameObject obj in tracked_objects)
         {
+            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2" ))
+            {
+                continue;
+            }
+           
             GameObject rootObj = obj.transform.root.gameObject;
-            if (!inView.Contains(rootObj)) continue;
+            if (!inView.Contains(obj)) continue;
 
             if (obj == null) continue;
+
+            
 
 
             grabbedandVisbil.text += obj.name + "\n";
@@ -106,14 +113,16 @@ public class Pause : MonoBehaviour
 
             if (!isMoving)
             {
+                Debug.Log("here" + obj.name + " is being seen and not moving");
                 if (!freezeTimers.ContainsKey(obj))
                     freezeTimers[obj] = 0f;
 
                 freezeTimers[obj] += Time.deltaTime;
+                Debug.Log(obj.name + ": has a freeze timer of " + freezeTimers[obj]);
 
                 if (!awaitingResponse && freezeTimers[obj] >= freezeThreshold && (last_trigger > cooldown_neg))
                 {
-                    Debug.LogWarning($"⏱️ Hesitation detected on: {obj.name}");
+                    Debug.Log($"⏱️ Hesitation detected on: {obj.name}");
                     awaitingResponse = true;
                     AskQuestion(questionPAudio);
                     freezeTimers[obj] = 0f;
@@ -127,11 +136,11 @@ public class Pause : MonoBehaviour
         }
 
         // Clean up timers for ungrabbed objects
-        foreach (var key in new List<GameObject>(freezeTimers.Keys))
-        {
-            if (!grabbedObjects.Contains(key))
-                freezeTimers.Remove(key);
-        }
+        // foreach (var key in new List<GameObject>(freezeTimers.Keys))
+        // {
+        //     if (!grabbedObjects.Contains(key))
+        //         freezeTimers.Remove(key);
+        // }
     }
 
     private void AskQuestion(AudioClip clip)
