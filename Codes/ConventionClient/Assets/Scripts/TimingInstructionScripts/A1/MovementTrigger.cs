@@ -65,7 +65,7 @@ public class MovementTrigger : MonoBehaviour
 
         if (isTriggerReady)
         {
-            Debug.Log("trigger stays ready");
+            Debug.Log("trigger is ready");
             HandleSuccessfulCondition();
         }
         // else
@@ -74,7 +74,7 @@ public class MovementTrigger : MonoBehaviour
         // }
     }
 
-    // Called when ALL conditions are met
+    // Called when both conditions are met
     private void HandleSuccessfulCondition()
     {
         //_gracePeriodTimer = 0f; // Reset grace period
@@ -82,7 +82,7 @@ public class MovementTrigger : MonoBehaviour
 
         if (_conditionMetTime >= requiredDuration)
         {
-            Debug.Log("trigger is going off trust your beep is just tweaking");
+            Debug.Log("trigger is going off ");
             TriggerAction();
         }
     }
@@ -90,12 +90,12 @@ public class MovementTrigger : MonoBehaviour
     // Called when ANY condition fails
     private void HandleFailedCondition()
     {
-        // Only penalize if we were making progress
+        // Only penalize if we the trigger is ready
         if (_conditionMetTime > 0)
         {
             _gracePeriodTimer += Time.deltaTime;
 
-            // If grace period expires, reset progress
+            // If grace period expires, reset trigger counter
             if (_gracePeriodTimer >= gracePeriod)
             {
                 _conditionMetTime = 0f;
