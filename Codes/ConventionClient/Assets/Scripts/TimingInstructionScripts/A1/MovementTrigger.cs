@@ -86,6 +86,7 @@ public class MovementTrigger : MonoBehaviour
         if (_conditionMetTime >= requiredDuration)
         {
             Debug.Log("trigger is going off ");
+            failedConditionCount = 0; 
             TriggerAction();
         }
     }
