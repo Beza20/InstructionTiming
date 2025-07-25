@@ -85,7 +85,7 @@ public class NegativeProgress : MonoBehaviour
             int activeGroup = progressScript.GetActiveGroup();
             if (activeGroup == -1)
             {
-                Debug.Log("stuck cuz active grp is -1");
+                //Debug.Log("stuck cuz active grp is -1");
                 return;
             }
 
@@ -131,7 +131,7 @@ public class NegativeProgress : MonoBehaviour
 
             // Trigger condition
             if (!awaitingResponse &&
-                downtickRatio >= 0.75f &&
+                downtickRatio >= 0.85f &&
                 delta >= 0.1f &&
                 last_trigger > cooldown_neg)
             {

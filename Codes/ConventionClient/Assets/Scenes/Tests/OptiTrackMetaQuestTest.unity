@@ -3679,6 +3679,7 @@ MonoBehaviour:
       m_Bits: 8
     _rayCount: 10
   rotationTracker: {fileID: 1809032991}
+  movementTracker: {fileID: 705678848}
   interviewManager: {fileID: 51742402}
   visiblOBj: {fileID: 681659767}
   grabbedOBj: {fileID: 452593514}
@@ -3688,6 +3689,7 @@ MonoBehaviour:
   yesButton: {fileID: 373053098}
   noButton: {fileID: 5554750}
   freezeThreshold: 5
+  freezeThresholdP2: 5
 --- !u!4 &257816827
 Transform:
   m_ObjectHideFlags: 0
@@ -14140,8 +14142,8 @@ MonoBehaviour:
   logWarnings: 1
   interviewManager: {fileID: 51742402}
   triggerLabel: negative_progress
-  historyDurationSeconds: 3
-  alpha: 0.1
+  historyDurationSeconds: 5
+  alpha: 0.15
   progressBar7: {fileID: 2052502148}
   progressBar8: {fileID: 558528723}
   yesButton: {fileID: 1091210966}
@@ -14876,7 +14878,7 @@ MonoBehaviour:
   movementTracker: {fileID: 705678848}
   objectTracker: {fileID: 1809032991}
   interviewManager: {fileID: 51742402}
-  requiredDuration: 5
+  requiredDuration: 4
   gracePeriod: 0.4
   cooldownDuration: 5
   _glassesTransform: {fileID: 946587914400265208}
@@ -16635,7 +16637,7 @@ MonoBehaviour:
   - {fileID: 302865949}
   - {fileID: 1299885402}
   - {fileID: 257572879}
-  grabDistanceThreshold: 0.2
+  grabDistanceThreshold: 0.14
 --- !u!4 &1430279533
 Transform:
   m_ObjectHideFlags: 0
@@ -20817,7 +20819,7 @@ MonoBehaviour:
   grabbingMonitor: {fileID: 1430279532}
   interviewManager: {fileID: 51742402}
   movementTracker: {fileID: 1809032991}
-  sustainThreshold: 5
+  sustainThreshold: 8
   triggerCooldown: 5
   grabbedOBj: {fileID: 1650305745}
   currentlyheld: {fileID: 1204024117}
@@ -22147,12 +22149,12 @@ MonoBehaviour:
   B2: {fileID: 1883910095}
   P: {fileID: 257816825}
   Random: {fileID: 1650119600}
-  isA1Active: 0
+  isA1Active: 1
   isA2Active: 1
-  isB1Active: 0
-  isB2Active: 0
-  isPActive: 0
-  isRActive: 0
+  isB1Active: 1
+  isB2Active: 1
+  isPActive: 1
+  isRActive: 1
 --- !u!4 &2011760710
 Transform:
   m_ObjectHideFlags: 0
@@ -23313,6 +23315,14 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 468752177975944459, guid: 19ed3e9ecb2214e4f916fe7a8bbd8657, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 468752177975944459, guid: 19ed3e9ecb2214e4f916fe7a8bbd8657, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 468752177975944459, guid: 19ed3e9ecb2214e4f916fe7a8bbd8657, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -24382,6 +24392,18 @@ PrefabInstance:
       value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 4857404763489254774, guid: 214eb89a4b1bd554daaeb0874b821320, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4857404763489254774, guid: 214eb89a4b1bd554daaeb0874b821320, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4857404763489254774, guid: 214eb89a4b1bd554daaeb0874b821320, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4857404763489254774, guid: 214eb89a4b1bd554daaeb0874b821320, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -24593,6 +24615,18 @@ PrefabInstance:
     - target: {fileID: 994009543456800228, guid: f6e4fbf73bf6dff4781d20724b123660, type: 3}
       propertyPath: m_IsActive
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6735115216895055335, guid: f6e4fbf73bf6dff4781d20724b123660, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6735115216895055335, guid: f6e4fbf73bf6dff4781d20724b123660, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6735115216895055335, guid: f6e4fbf73bf6dff4781d20724b123660, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.2
       objectReference: {fileID: 0}
     - target: {fileID: 6735115216895055335, guid: f6e4fbf73bf6dff4781d20724b123660, type: 3}
       propertyPath: m_LocalPosition.x

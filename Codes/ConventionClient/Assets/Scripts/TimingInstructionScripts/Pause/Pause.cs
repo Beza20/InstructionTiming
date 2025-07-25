@@ -13,6 +13,7 @@ public class Pause : MonoBehaviour
     [SerializeField] private HandGrabbingMonitor grabbingMonitor;
     [SerializeField] private ConecastHandling conecast;
     [SerializeField] private ObjectRotationTracker rotationTracker;
+    [SerializeField] private MovementTracker movementTracker;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
     public TextMeshProUGUI visiblOBj;
     public TextMeshProUGUI grabbedOBj;
@@ -30,17 +31,21 @@ public class Pause : MonoBehaviour
 
 
     [Header("Trigger Settings")]
-    [SerializeField] private float freezeThreshold = 3f;
+    [SerializeField] private float freezeThreshold = 5f;
+    [SerializeField] private float freezeThresholdP2 = 4f;
 
     private float cooldown_neg = 5f;
+    private float cooldown_negP2 = 5f;
     private float last_trigger = 0;
 
     //public UnityEvent OnHesitationDetected;
 
     private Dictionary<GameObject, float> freezeTimers = new();
+    private Dictionary<GameObject, float> freezeTimersP2 = new();
 
     private bool awaitingResponse = false;
     private string responseQ1 = "";
+    private string pendingPauseLabel = "pause";  // default
     private Transform ActiveHead => interviewManager != null ? interviewManager.ActiveHead : null;
 
     void Start()
@@ -52,7 +57,7 @@ public class Pause : MonoBehaviour
         noButton.gameObject.SetActive(false);
     }
 
-   
+
 
     void Update()
     {
@@ -68,7 +73,7 @@ public class Pause : MonoBehaviour
         sth_moving = false;
         foreach (GameObject obj in tracked_objects)
         {
-            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2" ))
+            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2"))
             {
                 Debug.Log("sth is moving so no pause");
                 sth_moving = true;
@@ -79,10 +84,10 @@ public class Pause : MonoBehaviour
             return;
         }
         foreach (GameObject obj in grabbedObjects)
-            {
-                grabbedOBj.text += obj.name + "\n";
+        {
+            grabbedOBj.text += obj.name + "\n";
 
-            }
+        }
         foreach (GameObject obj in inView)
         {
             visiblOBj.text += obj.name + "\n";
@@ -94,17 +99,17 @@ public class Pause : MonoBehaviour
 
         foreach (GameObject obj in tracked_objects)
         {
-            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2" ))
+            if (rotationTracker.IsObjectMoving(obj) && (obj.name != "glass1" || obj.name != "glass2"))
             {
                 continue;
             }
-           
+
             GameObject rootObj = obj.transform.root.gameObject;
             if (!inView.Contains(obj)) continue;
 
             if (obj == null) continue;
 
-            
+
 
 
             grabbedandVisbil.text += obj.name + "\n";
@@ -113,18 +118,18 @@ public class Pause : MonoBehaviour
 
             if (!isMoving)
             {
-                Debug.Log("here" + obj.name + " is being seen and not moving");
+                //Debug.Log("here" + obj.name + " is being seen and not moving");
                 if (!freezeTimers.ContainsKey(obj))
                     freezeTimers[obj] = 0f;
 
                 freezeTimers[obj] += Time.deltaTime;
-                Debug.Log(obj.name + ": has a freeze timer of " + freezeTimers[obj]);
+               // Debug.Log(obj.name + ": has a freeze timer of " + freezeTimers[obj]);
 
-                if (!awaitingResponse && freezeTimers[obj] >= freezeThreshold && (last_trigger > cooldown_neg))
+                if (!awaitingResponse && freezeTimers[obj] >= freezeThreshold && (last_trigger > cooldown_neg) && movementTracker.AreHandsStill)
                 {
-                    Debug.Log($"⏱️ Hesitation detected on: {obj.name}");
+                   // Debug.Log($"⏱️ Hesitation detected on: {obj.name}");
                     awaitingResponse = true;
-                    AskQuestion(questionPAudio);
+                    AskQuestion(questionPAudio, "pause1");
                     freezeTimers[obj] = 0f;
                     last_trigger = 0;
                 }
@@ -134,22 +139,58 @@ public class Pause : MonoBehaviour
                 freezeTimers[obj] = 0f; // reset if motion resumes
             }
         }
+        foreach (GameObject obj in grabbedObjects)
+        {
+            GameObject rootObj = obj.transform.root.gameObject;
+            if (!inView.Contains(rootObj)) continue;
+
+            if (obj == null) continue;
+
+
+            grabbedandVisbil.text += obj.name + "\n";
+
+            bool isMoving = rotationTracker.IsObjectMoving(obj);
+
+            if (!isMoving)
+            {
+                if (!freezeTimersP2.ContainsKey(obj))
+                    freezeTimersP2[obj] = 0f;
+
+                freezeTimersP2[obj] += Time.deltaTime;
+
+                if (!awaitingResponse && freezeTimersP2[obj] >= freezeThresholdP2 && (last_trigger > cooldown_negP2))
+                {
+                    //Debug.LogWarning($"⏱️ Hesitation detected on: {obj.name}");
+                    awaitingResponse = true;
+                    AskQuestion(questionPAudio, "pause2");
+                    freezeTimersP2[obj] = 0f;
+                    last_trigger = 0;
+                }
+            }
+            else
+            {
+                freezeTimersP2[obj] = 0f; // reset if motion resumes
+            }
+        }
 
         // Clean up timers for ungrabbed objects
-        // foreach (var key in new List<GameObject>(freezeTimers.Keys))
-        // {
-        //     if (!grabbedObjects.Contains(key))
-        //         freezeTimers.Remove(key);
-        // }
+        foreach (var key in new List<GameObject>(freezeTimersP2.Keys))
+        {
+            if (!grabbedObjects.Contains(key))
+                freezeTimersP2.Remove(key);
+        }
+
+        
     }
 
-    private void AskQuestion(AudioClip clip)
+    private void AskQuestion(AudioClip clip, string pauseLabel)
     {
         questionAudioSource.clip = clip;
         questionAudioSource.Play();
 
         yesButton.gameObject.SetActive(true);
         noButton.gameObject.SetActive(true);
+        pendingPauseLabel = pauseLabel;
     }
 
     private void OnAnswer(string answer)
@@ -165,7 +206,7 @@ public class Pause : MonoBehaviour
         {
             yesButton.gameObject.SetActive(false);
             noButton.gameObject.SetActive(false);
-            interviewManager?.TriggerInterview("pause");
+            interviewManager?.TriggerInterview(pendingPauseLabel);
 
         }
         if (answer == "Yes")

@@ -20,26 +20,12 @@ public class GrabIncorrectPiece : MonoBehaviour
     private Dictionary<GameObject, float> grabTimers = new(); // tracks how long each incorrect object is held
     public TextMeshProUGUI grabbedOBj;
     public TextMeshProUGUI currentlyheld;
-    private float startDelay = 15f;
-    private float elapsedTime = 0f;
-    private bool started = false;
+    string triggerLabel = "B2-grab-incorrectpiece";
 
 
 
     void Update()
     {
-        if (!started)
-        {
-            elapsedTime += Time.deltaTime;
-            if (elapsedTime >= startDelay)
-            {
-                started = true;
-            }
-            else
-            {
-                return; // wait until 6 seconds have passed
-            }
-        }
         if (interviewManager == null || progressScript == null || grabbingMonitor == null) return;
         grabbedOBj.text = "";
         currentlyheld.text = "";
@@ -50,6 +36,33 @@ public class GrabIncorrectPiece : MonoBehaviour
         if (activeGroup == -1) return;
         Debug.Log(activeGroup + " is the active group");
 
+        if (activeGroup == 3)
+        {
+            if (!progressScript.IsGroupComplete(0) || !progressScript.IsGroupComplete(1) || !progressScript.IsGroupComplete(2))
+            {
+                if (Time.time - lastTriggerTime > triggerCooldown)
+                {
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece-active-grp3-whilst0,1,2-notComplete");
+                    lastTriggerTime = now;
+                    return;
+                }
+
+            }
+           
+        }
+        if (activeGroup == 1)
+        {
+            if (!progressScript.IsGroupComplete(0))
+            {
+                if (Time.time - lastTriggerTime > triggerCooldown)
+                {
+                    interviewManager?.TriggerInterview("B2-grab incorrect piece-activegrp1-whilst0-notcomplete");
+                    lastTriggerTime = now;
+                    return;                
+                }
+                 
+            }
+        }
         
 
         List<int> activeSubtasks = new List<int>();
@@ -137,6 +150,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             }
 
             if (hand == null || !IsMovingTogether(hand, obj)) continue;
+            Debug.Log("never getting here?");
 
             if (!grabTimers.ContainsKey(obj))
                 grabTimers[obj] = now;
@@ -145,6 +159,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             if (heldDuration >= sustainThreshold)
             {
                 Debug.Log($"Sustained incorrect grab: {obj.name} for {heldDuration:F1}s with moving hand and object");
+                triggerLabel = "B2-grab-incorrectpiece for piece: " + obj.name;
                 triggered = true;
             }
         }
@@ -178,7 +193,8 @@ public class GrabIncorrectPiece : MonoBehaviour
             if (IsMovingTogether(grabbingMonitor.leftHandRigidbody.gameObject, leftObj) &&
                 IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, rightObj))
             {
-                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA and are moving with them — coordination issue." );
+                Debug.Log("Both hands are grabbing different objects from SubtaskPiecesA and are moving with them — coordination issue.");
+                triggerLabel = "B2-grab-incorrectpiece - coordination issue for " + leftObj.name + " and " + rightObj.name;
                 triggered = true;
             }
         }
@@ -192,6 +208,7 @@ public class GrabIncorrectPiece : MonoBehaviour
                 IsMovingTogether(grabbingMonitor.rightHandRigidbody.gameObject, rightObj))
             {
                 Debug.Log("Both hands are grabbing different objects from SubtaskPiecesB and are moving with them — coordination issue.");
+                triggerLabel = "B2-grab-incorrectpiece - coordination issue for " + leftObj.name + " and " + rightObj.name;
                 triggered = true;
             }
         }
@@ -199,7 +216,7 @@ public class GrabIncorrectPiece : MonoBehaviour
         // Final trigger
         if (triggered && Time.time - lastTriggerTime > triggerCooldown)
         {
-            interviewManager?.TriggerInterview("B2-grab-incorrectpiece");
+            interviewManager?.TriggerInterview(triggerLabel);
             lastTriggerTime = now;
         }
     }

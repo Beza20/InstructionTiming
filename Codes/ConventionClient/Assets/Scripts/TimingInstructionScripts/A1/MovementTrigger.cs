@@ -28,8 +28,8 @@ public class MovementTrigger : MonoBehaviour
 
     public TextMeshProUGUI head;
     public TextMeshProUGUI hands;
-    private int failedConditionCount = 0;
-    [SerializeField] private int maxFailedAttempts = 3;
+    // private int failedConditionCount = 0;
+    // [SerializeField] private int maxFailedAttempts = 3;
 
 
     void Update()
@@ -80,13 +80,13 @@ public class MovementTrigger : MonoBehaviour
     // Called when both conditions are met
     private void HandleSuccessfulCondition()
     {
-        //_gracePeriodTimer = 0f; // Reset grace period
+        _gracePeriodTimer = 0f; // Reset grace period
         _conditionMetTime += Time.deltaTime;
 
         if (_conditionMetTime >= requiredDuration)
         {
             Debug.Log("trigger is going off ");
-            failedConditionCount = 0; 
+            //failedConditionCount = 0; 
             TriggerAction();
         }
     }
@@ -94,10 +94,7 @@ public class MovementTrigger : MonoBehaviour
     // Called when ANY condition fails
     private void HandleFailedCondition()
     {
-        if (failedConditionCount >= maxFailedAttempts)
-        {
-            return;
-        }
+       
         // Only penalize if we the trigger is ready
         if (_conditionMetTime > 0)
         {
@@ -109,8 +106,6 @@ public class MovementTrigger : MonoBehaviour
                 _conditionMetTime = 0f;
                 _gracePeriodTimer = 0f;
                     
-                failedConditionCount++; 
-                Debug.Log("failed " + failedConditionCount + "times");
             }
         }
     }
