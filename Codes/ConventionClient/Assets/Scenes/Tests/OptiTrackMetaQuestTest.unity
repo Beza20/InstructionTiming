@@ -14142,7 +14142,7 @@ MonoBehaviour:
   logWarnings: 1
   interviewManager: {fileID: 51742402}
   triggerLabel: negative_progress
-  historyDurationSeconds: 5
+  historyDurationSeconds: 3
   alpha: 0.15
   progressBar7: {fileID: 2052502148}
   progressBar8: {fileID: 558528723}
@@ -18558,7 +18558,7 @@ MonoBehaviour:
   epsilonQ: 0.02
   deltaPMax: 0.5
   wP: 0.793
-  wQ: 0.296
+  wQ: 0.207
 --- !u!1 &1649910342
 GameObject:
   m_ObjectHideFlags: 0
@@ -20819,6 +20819,7 @@ MonoBehaviour:
   grabbingMonitor: {fileID: 1430279532}
   interviewManager: {fileID: 51742402}
   movementTracker: {fileID: 1809032991}
+  handstracker: {fileID: 705678848}
   sustainThreshold: 8
   triggerCooldown: 5
   grabbedOBj: {fileID: 1650305745}

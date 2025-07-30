@@ -11,6 +11,7 @@ public class GrabIncorrectPiece : MonoBehaviour
     [SerializeField] private HandGrabbingMonitor grabbingMonitor;
     [SerializeField] private TriggerManagerCoordinator interviewManager;
     public ObjectRotationTracker movementTracker;
+    public MovementTracker handstracker;
 
     [Header("Trigger Timing")]
     [SerializeField] private float sustainThreshold = 3f;    // how long an incorrect piece must be held
@@ -69,16 +70,24 @@ public class GrabIncorrectPiece : MonoBehaviour
 
         if (activeGroup == 3)
         {
+            // Always include Groups 0–2 when Group 3 is active
+            activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[0]);
+            activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[1]);
+            activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[2]);
+
+            // Include current Group 3 task if it's set
             int currentGrp3task = progressScript.currentGrp3Subtask();
             if (currentGrp3task != -1)
             {
                 activeSubtasks.Add(currentGrp3task);
-                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[0]);
-                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[1]);
-                activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[2]);
-
             }
         }
+        else if (activeGroup == 1)
+        {
+            activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[0]);
+            activeSubtasks.AddRange(progressScript.GetGroupedSubtasks()[1]);     
+        }
+
         else
         {
             activeSubtasks = progressScript.GetGroupedSubtasks()[activeGroup];
@@ -185,7 +194,7 @@ public class GrabIncorrectPiece : MonoBehaviour
         bool leftIsB = leftGrabbed.Exists(obj => activeGroupPiecesB.Contains(obj.transform.root.gameObject));
         bool rightIsB = rightGrabbed.Exists(obj => activeGroupPiecesB.Contains(obj.transform.root.gameObject));
 
-        if (leftIsA && rightIsA && !IsGrabbingSameObject(leftGrabbed, rightGrabbed))
+        if (leftIsA && rightIsA && !IsGrabbingSameObject(leftGrabbed, rightGrabbed) && (activeGroup == 0 || activeGroup == 2))
         {
             GameObject leftObj = leftGrabbed.Count > 0 ? leftGrabbed[0] : null;
             GameObject rightObj = rightGrabbed.Count > 0 ? rightGrabbed[0] : null;
@@ -199,7 +208,7 @@ public class GrabIncorrectPiece : MonoBehaviour
             }
         }
 
-        if (leftIsB && rightIsB && !IsGrabbingSameObject(leftGrabbed, rightGrabbed))
+        if (leftIsB && rightIsB && !IsGrabbingSameObject(leftGrabbed, rightGrabbed) && (activeGroup == 0 || activeGroup == 2))
         {
             GameObject leftObj = leftGrabbed.Count > 0 ? leftGrabbed[0] : null;
             GameObject rightObj = rightGrabbed.Count > 0 ? rightGrabbed[0] : null;
@@ -246,14 +255,14 @@ public class GrabIncorrectPiece : MonoBehaviour
         GameObject rootHand = hand.transform.root.gameObject;
         GameObject rootObj = obj.transform.root.gameObject;
 
-        bool handMoving = movementTracker.IsObjectMoving(rootHand);
+        bool handMoving = handstracker.AreHandsStillA1();
         bool objMoving = movementTracker.IsObjectMoving(rootObj);
 
         Debug.Log($"IsMovingTogether - " +
                 $"Hand '{rootHand.name}' moving: {handMoving}, " +
                 $"Object '{rootObj.name}' moving: {objMoving}");
 
-        return objMoving;
+        return objMoving && !handMoving;
     }
     public void ResetTrigger()
     {
